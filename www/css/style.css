@@ -1111,3 +1111,11 @@ body.lt.nt #qrm{background:rgba(0,0,0,.6)!important}
 .rbar span:hover{transform:scale(1.25);background:rgba(128,128,160,.18)}
 .rx{display:inline-flex;align-items:center;gap:3px;margin-top:4px;padding:1px 7px;border-radius:999px;font-size:13px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35)}
 body.lt:not(.nt) .rx{background:rgba(110,90,230,.12);border-color:rgba(110,90,230,.3)}
+
+/* ===== Faz 9: Uçtan Uca Şifreleme (E2EE) Göstergeleri ===== */
+.e2b{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;background:rgba(0,230,118,.18);border:1px solid rgba(0,230,118,.48);color:#00e676;vertical-align:middle}
+body.lt:not(.nt) .e2b{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.45);color:#0a7c52}
+.elock{font-size:10px;margin-right:3px;opacity:.75}
+#pfSec .pf-em{font-size:20px;letter-spacing:4px;margin:4px 0}
+#pfSec code{font-size:13px;letter-spacing:1.5px;font-weight:700}
+#pfSec .pf-note{font-size:11px;opacity:.7;margin-top:5px;line-height:1.35}

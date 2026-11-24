@@ -39,12 +39,12 @@ function renderMsgs(){const f=st.friends[sel];
 $("cav").className="fr "+stc(f);$("cav").innerHTML=`<div class="fi">${avH(f)}</div>`;
 $("mav").className="fr "+stc(f,1);$("mav").innerHTML=`<div class="fi">${myAv()}</div>`;
 $("hn").textContent=f.n;{const c=calls[f.pin],ca=c&&c.on;$("hst").className=ca?"on":f.s;$("hst").innerHTML='<i class="hdot"></i>'+(ca?(c.t=="video"?"Görüntülü görüşmede":"Sesli görüşmede"):({on:"Çevrimiçi",busy:"Meşgul",off:"Çevrimdışı"})[f.s])}
-$("hs").innerHTML=typing[f.pin]?"yazıyor…":f.np?'<svg class="si" viewBox="0 0 24 24" style="opacity:1"><defs><linearGradient id="npg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4fe3e0"/><stop offset="1" stop-color="var(--t158,#a78bfa)"/></linearGradient></defs><path d="M9 18V6l11-2v12" fill="none" stroke="url(#npg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6.5" cy="18" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/><ellipse cx="17.5" cy="16" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/></svg>Şu an dinliyor: '+esc(f.np):f.s=="off"?"Son görülme: "+esc(f.ls||"yakınlarda"):(f.bio!=null?esc(f.bio):"");$("hp").innerHTML='<svg class="pw" viewBox="0 0 16 16"><path d="M2 8v0M5 5v6M8 3v10M11 6v4M14 8v0" stroke="var(--t159,#7a86d8)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>PIN: '+esc(f.pin)+'<svg class="pc" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+$("hs").innerHTML=typing[f.pin]?"yazıyor…":f.np?'<svg class="si" viewBox="0 0 24 24" style="opacity:1"><defs><linearGradient id="npg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4fe3e0"/><stop offset="1" stop-color="var(--t158,#a78bfa)"/></linearGradient></defs><path d="M9 18V6l11-2v12" fill="none" stroke="url(#npg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6.5" cy="18" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/><ellipse cx="17.5" cy="16" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/></svg>Şu an dinliyor: '+esc(f.np):f.s=="off"?"Son görülme: "+esc(f.ls||"yakınlarda"):(f.bio!=null?esc(f.bio):"");$("hp").innerHTML='<svg class="pw" viewBox="0 0 16 16"><path d="M2 8v0M5 5v6M8 3v10M11 6v4M14 8v0" stroke="var(--t159,#7a86d8)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>PIN: '+esc(f.pin)+'<svg class="pc" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+(f.pubKey?'<span class="e2b" title="Uçtan uca şifreli">🔒 E2EE</span>':"");
 let html=st.set.timed?'<div class="nd">⏳ Süreli mesajlar açık: 24 saat konuşulmazsa mesajlar herkesten silinir</div>':"",last=null,lastRecv=null;
 f.h.forEach(m=>{if(m.k=="c"){html+=`<div class="nd">${esc(m.txt)}</div>`;last=null;return}if(m.k=="n"){html+=`<div class="nd">${m.me?"Titreşim Gönderdin 😍":"Titreşim Alındı 🤓"}</div>`;last=null;return}
 if(last!==m.me){html+=`<div class="who${m.me?" mine":""}">${esc(m.me?st.set.name:f.n)}:</div>`;last=m.me}
 const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.aud&&window.RetroVoice?RetroVoice.renderHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>")+(m.rx?`<div><span class="rx">${esc(m.rx)}</span></div>`:"");
-html+=`<div class="ml ${m.me?"mine":""}" onclick="menu(event,'${m.id}')"><span class="th">${m.me?myAv():avH(f)}</span><div class="bub"><span class="bl">•</span><span class="bt">${body}</span><i>${m.at}${m.del?"":tk(m)}</i></div></div>`;if(!m.me)lastRecv=m.at});
+html+=`<div class="ml ${m.me?"mine":""}" onclick="menu(event,'${m.id}')"><span class="th">${m.me?myAv():avH(f)}</span><div class="bub"><span class="bl">•</span><span class="bt">${body}</span><i>${m.e2ee&&!m.del?'<span class="elock" title="Uçtan uca şifreli">🔒</span>':""}${m.at}${m.del?"":tk(m)}</i></div></div>`;if(!m.me)lastRecv=m.at});
 if(lastRecv)html+=`<div class="lr">Son alınan ileti zamanı: ${new Date().toLocaleDateString("tr-TR")} - ${lastRecv}.</div>`;
 if(typing[f.pin])html+='<div class="tb"><i></i><i></i><i></i></div>';
 $("msgs").innerHTML=html;$("msgs").scrollTop=1e9;renderList();updCbar()}
@@ -105,9 +105,9 @@ $("add").onclick=e=>{if(e.target.id=="add"){QR.stopCam();$("add").style.display=
 $("aOk").onclick=()=>{const e=addFriend("",$("aP").value);if(e)return msg(e,0);$("aP").value="";$("add").style.display="none"};
 
 let pfi=0,pfMe=false;
-function openPF(i){pfMe=false;$("pfVis").style.display="none";$("pfGo").style.display="";$("pfGal").style.display="";$("pfCam").style.display="";$("pfNp").style.display="none";$("pfSp").style.display="none";$("pfSpOff").style.display="none";pfi=i;const f=st.friends[i];$("pfa").innerHTML=avH(f)+`<span class="dot ${stc(f)}"></span>`;$("pfa").dataset.st=f.s;$("pfn").textContent=f.n;const ps=$("pfs");ps.textContent=({on:"● Online",busy:"● Meşgul",off:"● Offline"})[f.s]+(f.s=="off"?" · son görülme "+(f.ls||"yakınlarda"):"");ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[f.s];$("pfm").textContent=f.np?"🎵 Şu an dinliyor: "+f.np:"";$("pfBio").value=f.bio!=null?f.bio:"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=f.pin;$("pf").style.display="flex"}
+function openPF(i){pfMe=false;$("pfVis").style.display="none";$("pfGo").style.display="";$("pfGal").style.display="";$("pfCam").style.display="";$("pfNp").style.display="none";$("pfSp").style.display="none";$("pfSpOff").style.display="none";pfi=i;const f=st.friends[i];$("pfa").innerHTML=avH(f)+`<span class="dot ${stc(f)}"></span>`;$("pfa").dataset.st=f.s;$("pfn").textContent=f.n;const ps=$("pfs");ps.textContent=({on:"● Online",busy:"● Meşgul",off:"● Offline"})[f.s]+(f.s=="off"?" · son görülme "+(f.ls||"yakınlarda"):"");ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[f.s];$("pfm").textContent=f.np?"🎵 Şu an dinliyor: "+f.np:"";$("pfBio").value=f.bio!=null?f.bio:"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=f.pin;const secBox=$("pfSec");if(secBox){secBox.style.display="none";if(f.pubKey&&window.RetroCrypto){RetroCrypto.ensureKeyPair(st).then(()=>RetroCrypto.safetyCode(f.pubKey)).then(sc=>{if(sc&&!pfMe&&st.friends[pfi]===f){$("pfSecE").textContent=sc.emojis;$("pfSecC").textContent=sc.code;secBox.style.display=""}}).catch(()=>{})}}$("pf").style.display="flex"}
 $("cav").onclick=()=>openPF(sel);$("mav").onclick=()=>openMyPF();$("myav").onclick=()=>openMyPF();$("mtS").onclick=()=>startCall("voice");$("mtG").onclick=()=>startCall("video");
-function openMyPF(){pfMe=true;$("pfGal").style.display="none";$("pfCam").style.display="none";const c=st.set,m={on:"● Online",busy:"● Meşgul",off:"● Offline"},ps=$("pfs");$("pfa").innerHTML=myAv()+`<span class="dot ${c.status}"></span>`;$("pfa").dataset.st=c.status;$("pfn").textContent=c.name;ps.textContent=m[c.status]||"";ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[c.status];$("pfm").textContent=c.mus&&c.song?"🎵 Şu an dinliyor: "+c.song:"";$("pfBio").value=c.stx||"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=st.pin;$("pfGo").style.display="none";$("pfNp").style.display="";myNpSync();visSync();$("pf").style.display="flex"}
+function openMyPF(){pfMe=true;if($("pfSec"))$("pfSec").style.display="none";$("pfGal").style.display="none";$("pfCam").style.display="none";const c=st.set,m={on:"● Online",busy:"● Meşgul",off:"● Offline"},ps=$("pfs");$("pfa").innerHTML=myAv()+`<span class="dot ${c.status}"></span>`;$("pfa").dataset.st=c.status;$("pfn").textContent=c.name;ps.textContent=m[c.status]||"";ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[c.status];$("pfm").textContent=c.mus&&c.song?"🎵 Şu an dinliyor: "+c.song:"";$("pfBio").value=c.stx||"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=st.pin;$("pfGo").style.display="none";$("pfNp").style.display="";myNpSync();visSync();$("pf").style.display="flex"}
 $("pfX").onclick=()=>$("pf").style.display="none";$("pfXt").onclick=()=>$("pf").style.display="none";
 $("pf").onclick=e=>{if(e.target.id=="pf")$("pf").style.display="none"};
 $("pfGo").onclick=()=>{$("pf").style.display="none";pick(pfi)};
@@ -417,6 +417,7 @@ function ensureFriendByPin(pin, prof) {
       np: (prof && prof.song) || "",
       bio: (prof && prof.stx) || "",
       photo: (prof && prof.photo) || null,
+      pubKey: (prof && prof.pubKey) || null,
       h: [],
       ls: "",
     };
@@ -436,6 +437,7 @@ function applyRemoteProfile(user) {
   if (user.stx != null) f.bio = user.stx;
   if (user.photo) f.photo = user.photo;
   else if (user.emo) f.e = user.emo;
+  if (user.pubKey) f.pubKey = user.pubKey;
   if (user.lastSeen) {
     const d = new Date(user.lastSeen);
     f.ls = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
@@ -507,6 +509,11 @@ $("in").addEventListener("input", () => {
 
 RetroTransport.init({
   getState: () => st,
+  onIdentityUpdated: () => save(),
+  onEncryptedSent: () => {
+    save();
+    renderMsgs();
+  },
   onLocalDeliver: deliver,
   onStatus: (state, label) => {
     const el = $("status");
@@ -544,8 +551,9 @@ RetroTransport.init({
       if (st.friends[sel] && st.friends[sel].pin === pin) renderMsgs();
     }
   },
-  onMessage: (fromPin, msg) => {
+  onMessage: (fromPin, msg, senderPubKey) => {
     const f = ensureFriendByPin(fromPin);
+    if (senderPubKey) f.pubKey = senderPubKey;
     const incoming = Object.assign({}, msg, { me: 0, at: msg.at || t(), ts: Date.now() });
     f.h.push(incoming);
     const viewing = st.friends[sel] === f && $("app").classList.contains("open");

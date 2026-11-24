@@ -191,6 +191,21 @@ function rememberPeerRelation(pinA, pinB) {
   if (setB) for (const w of setB) if (w.friends) w.friends.add(pinA);
 }
 
+function validPubKey(k) {
+  return !!(
+    k &&
+    typeof k === "object" &&
+    k.kty === "EC" &&
+    k.crv === "P-256" &&
+    typeof k.x === "string" &&
+    typeof k.y === "string" &&
+    k.x.length > 20 &&
+    k.x.length < 120 &&
+    k.y.length > 20 &&
+    k.y.length < 120
+  );
+}
+
 function publicProfile(pin) {
   const u = store.users[pin];
   const isOnline = clients.has(pin) && clients.get(pin).size > 0;
@@ -205,6 +220,7 @@ function publicProfile(pin) {
     emo: p.emo || "",
     anim: p.anim || "none",
     photo: p.photo || null,
+    pubKey: u.pubKey || null,
     lastSeen: u.lastSeen || Date.now(),
   };
 }
@@ -273,6 +289,7 @@ const server = http.createServer((req, res) => {
         mediaCount: Object.keys(store.media).length,
         pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
         turnReady: true,
+        e2eeReady: true,
         uptimeSec: Math.floor(process.uptime()),
       })
     );
@@ -500,6 +517,9 @@ wss.on("connection", (ws) => {
       store.users[pin] = {
         token,
         profile: Object.assign(existing ? existing.profile || {} : {}, data.profile || {}),
+        pubKey: validPubKey(data.pubKey)
+          ? { kty: "EC", crv: "P-256", x: data.pubKey.x, y: data.pubKey.y }
+          : (existing && existing.pubKey) || null,
         lastSeen: Date.now(),
       };
       scheduleSave();
@@ -564,6 +584,9 @@ wss.on("connection", (ws) => {
             store.users[from].profile || {},
             data.profile || {}
           );
+          if (validPubKey(data.pubKey)) {
+            store.users[from].pubKey = { kty: "EC", crv: "P-256", x: data.pubKey.x, y: data.pubKey.y };
+          }
           store.users[from].lastSeen = Date.now();
           scheduleSave();
           broadcastPresence(from);
@@ -604,16 +627,19 @@ wss.on("connection", (ws) => {
       case "msg": {
         if (!to || !data.msg) break;
         rememberPeerRelation(from, to);
+        const senderPubKey = (store.users[from] && store.users[from].pubKey) || null;
         const delivered = sendToPin(
           to,
-          { type: "msg", from, msg: data.msg, timed: !!data.timed },
+          { type: "msg", from, msg: data.msg, senderPubKey, timed: !!data.timed },
           true
         );
         if (delivered && data.msg.id) {
           sendJSON(ws, { type: "delivered", from: to, msgId: data.msg.id });
         }
         const m = data.msg;
-        const preview = m.aud
+        const preview = m.e2ee
+          ? "🔒 Yeni şifreli mesaj"
+          : m.aud
           ? "🎤 Sesli mesaj (" + (m.aud.dur || "0:01") + ")"
           : m.med
           ? (m.med.mode === "once" ? "👁 Tek seferlik medya" : m.med.k === "vid" ? "🎞 Video" : "📷 Fotoğraf")

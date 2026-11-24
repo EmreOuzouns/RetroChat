@@ -52,6 +52,11 @@
   function regeneratePin(state) {
     state.pin = randomHex(8);
     state.authToken = randomHex(32);
+    if (global.RetroCrypto && global.RetroCrypto.rotateKeyPair) {
+      global.RetroCrypto.rotateKeyPair(state).then(() => {
+        if (handlers.onIdentityUpdated) handlers.onIdentityUpdated();
+      }).catch(() => {});
+    }
     if (ws && ws.readyState === 1) {
       ws.close();
     }
@@ -115,23 +120,32 @@
       return;
     }
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       connected = true;
       retryDelay = 1500;
       const st = getStateFn();
       ensureIdentity(st);
+      let pubKey = null;
+      if (global.RetroCrypto && global.RetroCrypto.ensureKeyPair) {
+        try {
+          pubKey = await global.RetroCrypto.ensureKeyPair(st);
+          if (handlers.onIdentityUpdated) handlers.onIdentityUpdated();
+        } catch (e) {}
+      }
+      if (!ws || ws.readyState !== 1) return;
       ws.send(
         JSON.stringify({
           type: "auth",
           pin: st.pin,
           token: st.authToken,
+          pubKey,
           profile: buildProfile(st),
           friends: (st.friends || []).map((f) => f.pin),
         })
       );
     };
 
-    ws.onmessage = (ev) => {
+    ws.onmessage = async (ev) => {
       let data;
       try {
         data = JSON.parse(ev.data);
@@ -158,9 +172,46 @@
         case "lookup_result":
           if (handlers.onLookupResult) handlers.onLookupResult(data.pin, data.user);
           break;
-        case "msg":
-          if (handlers.onMessage) handlers.onMessage(data.from, data.msg);
+        case "msg": {
+          let incoming = data.msg;
+          const st = getStateFn ? getStateFn() : null;
+          const fMatch = st && st.friends ? st.friends.find((x) => x.pin === data.from) : null;
+          const peerPub =
+            (incoming && incoming.pubKey) ||
+            data.senderPubKey ||
+            (fMatch && fMatch.pubKey) ||
+            null;
+          if (incoming && incoming.e2ee && global.RetroCrypto) {
+            try {
+              if (st) await global.RetroCrypto.ensureKeyPair(st);
+              const dec = peerPub
+                ? await global.RetroCrypto.decryptPayload(peerPub, incoming.e2ee)
+                : null;
+              if (dec && typeof dec === "object") {
+                incoming = Object.assign(
+                  { id: incoming.id, at: incoming.at, e2ee: true },
+                  dec
+                );
+              } else {
+                incoming = {
+                  id: incoming.id,
+                  at: incoming.at,
+                  t: "🔒 Şifreli mesaj çözülemedi (cihaz anahtarı değişmiş olabilir)",
+                  e2ee: true,
+                };
+              }
+            } catch (e) {
+              incoming = {
+                id: incoming.id,
+                at: incoming.at,
+                t: "🔒 Şifreli mesaj çözülemedi",
+                e2ee: true,
+              };
+            }
+          }
+          if (handlers.onMessage) handlers.onMessage(data.from, incoming, peerPub);
           break;
+        }
         case "nudge":
           if (handlers.onNudge) handlers.onNudge(data.from);
           break;
@@ -242,7 +293,8 @@
 
   function sendProfile(state) {
     if (config.mode !== "ws") return;
-    rawSend({ type: "profile_update", profile: buildProfile(state) });
+    const pubKey = global.RetroCrypto ? global.RetroCrypto.getPublicKey() : null;
+    rawSend({ type: "profile_update", profile: buildProfile(state), pubKey });
   }
 
   function lookupPin(pin) {
@@ -250,14 +302,39 @@
     rawSend({ type: "lookup_pin", pin });
   }
 
-  function sendMessage(friend, msg) {
+  async function sendMessage(friend, msg) {
     if (config.mode === "ws") {
       const st = getStateFn ? getStateFn() : null;
-      const clean = Object.assign({}, msg);
+      let wireMsg = Object.assign({}, msg);
+      if (global.RetroCrypto && friend && friend.pubKey && global.RetroCrypto.validPubJwk(friend.pubKey)) {
+        try {
+          if (st) await global.RetroCrypto.ensureKeyPair(st);
+          const secretFields = {
+            t: msg.t || "",
+            r: msg.r || null,
+            img: msg.img || null,
+            med: msg.med || null,
+            aud: msg.aud || null,
+            file: msg.file || null,
+            loc: msg.loc || null,
+          };
+          const enc = await global.RetroCrypto.encryptPayload(friend.pubKey, secretFields);
+          if (enc) {
+            msg.e2ee = true;
+            wireMsg = {
+              id: msg.id,
+              at: msg.at,
+              e2ee: enc,
+              pubKey: global.RetroCrypto.getPublicKey(),
+            };
+            if (handlers.onEncryptedSent) handlers.onEncryptedSent();
+          }
+        } catch (e) {}
+      }
       rawSend({
         type: "msg",
         to: friend.pin,
-        msg: clean,
+        msg: wireMsg,
         timed: !!(st && st.set && st.set.timed),
       });
       return;
