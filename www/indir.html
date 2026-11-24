@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060918">
 <title>RetroChat — Android & iOS İndir</title>
-<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}
@@ -17,9 +19,10 @@ h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 
 .badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(0,229,255,.14);border:1px solid rgba(0,229,255,.4);color:#7fe6ff;margin-bottom:16px}
 .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;border-radius:18px;font-size:15px;font-weight:700;text-decoration:none;border:0;cursor:pointer;margin-bottom:10px;transition:transform .15s,box-shadow .15s}
 .btn:active{transform:scale(.98)}
+.btn.inst{background:linear-gradient(135deg,#00e5ff,#8f6bff);color:#fff;box-shadow:0 6px 24px rgba(0,200,255,.45)}
 .btn.and{background:linear-gradient(135deg,#2fd97a,#0fb86a);color:#042414;box-shadow:0 6px 20px rgba(47,217,122,.35)}
 .btn.ios{background:linear-gradient(135deg,#ffffff,#d8e2ff);color:#0d1333;box-shadow:0 6px 20px rgba(180,200,255,.3)}
-.btn.pri{background:linear-gradient(135deg,#00c6ff,#8f6bff);color:#fff;box-shadow:0 6px 20px rgba(80,150,255,.4)}
+.btn.pri{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.22);color:#fff}
 .box{text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:14px 16px;margin-top:12px;font-size:12.5px;line-height:1.55;color:#d6dcf8}
 .box b{color:#fff;display:block;margin-bottom:5px;font-size:13.5px}
 .box ol{margin:0;padding-left:18px}
@@ -29,34 +32,40 @@ h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 
 </head>
 <body>
 <div class="card">
-  <img src="icons/icon.svg" alt="RetroChat" class="ico">
+  <img src="icons/icon-192.png" alt="RetroChat" class="ico">
   <h1>RETROCHAT</h1>
   <p class="sub">Yalnızca 8 haneli PIN ile anlık mesajlaşma, gerçek telefon titreşimi, sesli/görüntülü arama ve canlı mini oyunlar.</p>
   <div id="devBadge" class="badge">Android & iOS İndirme Merkezi</div>
 
-  <a href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.apk" class="btn and">🤖 Android İndir (.apk)</a>
-  <a href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.ipa" class="btn ios">🍎 iOS İndir (.ipa)</a>
-  <a href="/" class="btn pri">🚀 Tarayıcıda Hemen Aç (Web / PWA)</a>
+  <button id="pwaBtn" class="btn inst" style="display:none">⚡ Tek Tıkla Uygulamayı Kur (Engelleyici Gerekmez)</button>
+  <a href="/" class="btn pri" id="openBtn">🚀 Uygulamayı Aç</a>
+  <a href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.apk" class="btn and">🤖 Android APK İndir (.apk)</a>
+  <a href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.ipa" class="btn ios">🍎 iOS IPA İndir (.ipa)</a>
 
   <div class="box">
-    <b>🤖 Android Kurulumu</b>
+    <b>⚡ Android — Otomatik Engelleyiciyi Kapatmadan Kur (Önerilen)</b>
     <ol>
-      <li><b>Android İndir (.apk)</b> butonuna basarak doğrudan indir.</li>
-      <li>İnen dosyaya dokun ve gerekirse <b>"Bilinmeyen kaynaklara izin ver"</b> seçeneğini açıp <b>Yükle</b> de.</li>
+      <li>Bu sayfayı <b>Google Chrome</b> ile aç.</li>
+      <li>Yukarıda çıkan <b>"Tek Tıkla Uygulamayı Kur"</b> butonuna (veya Chrome sağ üst <b>⋮ → Ana ekrana ekle → Yükle</b>) bas.</li>
+      <li>Samsung Otomatik Engelleyiciye takılmadan telefonuna <b>gerçek uygulama ikonuyla</b> kurulur; titreşim, kamera ve aramalar tam çalışır!</li>
     </ol>
   </div>
 
   <div class="box">
     <b>🍎 iPhone (iOS) Kurulumu</b>
     <ol>
-      <li><b>En Hızlı (10 sn):</b> Yukarıdan <b>Tarayıcıda Hemen Aç</b> → Safari'de <b>Paylaş (⬆️) → Ana Ekrana Ekle</b>.</li>
-      <li><b>Native (.ipa):</b> <b>iOS İndir (.ipa)</b> ile indirip <b>AltStore / Sideloadly</b> (ücretsiz) veya Apple Developer / TestFlight ile iPhone'una yükle.</li>
+      <li><b>En Hızlı (10 sn):</b> Safari ile <b>Uygulamayı Aç</b> → <b>Paylaş (⬆️) → Ana Ekrana Ekle</b>.</li>
+      <li><b>Native (.ipa):</b> Yukarıdan <code>retrochat.ipa</code> indirip <b>AltStore / Sideloadly</b> veya TestFlight ile yükle.</li>
     </ol>
   </div>
 
   <div class="ft">E-posta veya telefon gerekmez · PIN ile bağlan</div>
 </div>
 <script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
 const ua = navigator.userAgent || "";
 const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const isAnd = /Android/i.test(ua);
@@ -64,6 +73,23 @@ const badge = document.getElementById("devBadge");
 if (isIOS) badge.textContent = "🍎 iPhone / iPad algılandı";
 else if (isAnd) badge.textContent = "🤖 Android cihaz algılandı";
 else badge.textContent = "💻 Masaüstü · Mobil İndirme Merkezi";
+
+let deferredPrompt = null;
+const pwaBtn = document.getElementById("pwaBtn");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  pwaBtn.style.display = "flex";
+});
+pwaBtn.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const res = await deferredPrompt.userChoice;
+  if (res.outcome === "accepted") {
+    pwaBtn.textContent = "✓ RetroChat telefonuna kuruldu!";
+    deferredPrompt = null;
+  }
+});
 </script>
 </body>
 </html>
