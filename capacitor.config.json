@@ -1,0 +1,14 @@
+{
+  "appId": "com.retrochat.app",
+  "appName": "RetroChat",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

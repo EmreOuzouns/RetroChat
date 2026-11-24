@@ -1,0 +1,15 @@
+{
+  "name": "retrochat-server",
+  "version": "1.0.0",
+  "description": "RetroChat PIN-based real-time messaging, nudge, games, and WebRTC signaling server",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

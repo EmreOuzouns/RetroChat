@@ -1,0 +1,27 @@
+{
+  "name": "retrochat",
+  "version": "1.0.0",
+  "description": "RetroChat - PIN tabanli gercek zamanli mesajlasma, arama ve mini oyun uygulamasi (iOS & Android)",
+  "private": true,
+  "scripts": {
+    "dev": "python -m http.server 8080 --directory www",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/camera": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/geolocation": "^6.0.0",
+    "@capacitor/haptics": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/share": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  }
+}
