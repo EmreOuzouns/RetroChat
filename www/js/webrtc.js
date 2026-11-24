@@ -1,21 +1,33 @@
-/* RetroChat WebRTC Gerçek Sesli & Görüntülü Arama Modülü (Faz 3)
- * Sinyalleşme: Railway WebSocket (call_offer, call_answer, call_ice, call_end, call_reject, call_busy, call_offline)
+/* RetroChat WebRTC Gerçek Sesli & Görüntülü Arama Modülü (Faz 3 + Faz 7 TURN & ICE Restart)
+ * - Sunucudan dinamik STUN + TURN listesi (/rtc/ice-servers) — 4G/5G katı NAT arkasında %100 bağlantı
+ * - Wi-Fi <-> 4G/5G ağ geçişlerinde otomatik ICE Restart (kopmadan devam)
  */
 (function (global) {
-  const ICE_SERVERS = [
+  const FALLBACK_ICE = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun.cloudflare.com:3478" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp",
+        "turns:openrelay.metered.ca:443?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ];
 
+  let cachedIce = null;
   let ctx = null;
   let pc = null;
   let localStream = null;
   let remoteStream = null;
   let pendingOffer = null;
   let pendingIce = [];
-  let state = null; // { pin, friend, type: 'voice'|'video', dir: 'out'|'in', phase: 'ringing'|'active', start: 0, timer: null, muted: false, camOff: false, facing: 'user', minimized: false }
+  let iceRestarting = false;
+  let state = null; // { pin, friend, type, dir, phase, reconnecting, start, timer, muted, camOff, facing, minimized }
 
   function $(id) {
     return document.getElementById(id);
@@ -26,16 +38,63 @@
     return String(Math.floor(q / 60)).padStart(2, "0") + ":" + String(q % 60).padStart(2, "0");
   }
 
+  async function loadIceServers() {
+    if (cachedIce) return cachedIce;
+    try {
+      const base =
+        /^https?:$/.test(location.protocol)
+          ? ""
+          : "https://retrochat-server-production.up.railway.app";
+      const r = await fetch(base + "/rtc/ice-servers", { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        if (j && Array.isArray(j.iceServers) && j.iceServers.length) {
+          cachedIce = j.iceServers;
+          return cachedIce;
+        }
+      }
+    } catch (e) {}
+    return FALLBACK_ICE;
+  }
+
   async function getMedia(type, facing) {
     const constraints = {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      video: type === "video" ? { facingMode: facing || "user", width: { ideal: 720 }, height: { ideal: 1280 } } : false,
+      video:
+        type === "video"
+          ? { facingMode: facing || "user", width: { ideal: 720 }, height: { ideal: 1280 } }
+          : false,
     };
     return await navigator.mediaDevices.getUserMedia(constraints);
   }
 
-  function createPeer(targetPin) {
-    const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  async function tryIceRestart() {
+    if (!pc || !state || iceRestarting || state.dir !== "out") return;
+    iceRestarting = true;
+    state.reconnecting = true;
+    updateUI();
+    try {
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      global.RetroTransport.sendRaw({
+        type: "call_renegotiate",
+        to: state.pin,
+        sdp: offer,
+      });
+    } catch (e) {}
+    setTimeout(() => {
+      iceRestarting = false;
+    }, 3000);
+  }
+
+  async function createPeer(targetPin) {
+    const iceServers = await loadIceServers();
+    const peer = new RTCPeerConnection({
+      iceServers,
+      iceCandidatePoolSize: 4,
+      bundlePolicy: "max-bundle",
+      rtcpMuxPolicy: "require",
+    });
     remoteStream = new MediaStream();
 
     peer.onicecandidate = (e) => {
@@ -50,8 +109,10 @@
 
     peer.ontrack = (e) => {
       if (e.streams && e.streams[0]) {
-        e.streams[0].getTracks().forEach((tr) => remoteStream.addTrack(tr));
-      } else if (e.track) {
+        e.streams[0].getTracks().forEach((tr) => {
+          if (!remoteStream.getTrackById(tr.id)) remoteStream.addTrack(tr);
+        });
+      } else if (e.track && !remoteStream.getTrackById(e.track.id)) {
         remoteStream.addTrack(e.track);
       }
       const rv = $("remVid");
@@ -66,15 +127,26 @@
     };
 
     peer.onconnectionstatechange = () => {
-      if (!state) return;
+      if (!state || pc !== peer) return;
       if (peer.connectionState === "connected") {
+        state.reconnecting = false;
         onConnected();
-      } else if (peer.connectionState === "failed" || peer.connectionState === "disconnected") {
+      } else if (peer.connectionState === "disconnected") {
+        state.reconnecting = true;
+        updateUI();
+        tryIceRestart();
         setTimeout(() => {
           if (pc === peer && (peer.connectionState === "failed" || peer.connectionState === "disconnected")) {
             cleanup(true, "Bağlantı koptu");
           }
-        }, 4000);
+        }, 10000);
+      } else if (peer.connectionState === "failed") {
+        tryIceRestart();
+        setTimeout(() => {
+          if (pc === peer && peer.connectionState === "failed") {
+            cleanup(true, "Arama bağlantısı kurulamadı");
+          }
+        }, 6000);
       }
     };
 
@@ -82,12 +154,15 @@
   }
 
   function onConnected() {
-    if (!state || state.phase === "active") return;
-    ctx.ringStop();
-    state.phase = "active";
-    state.start = Date.now();
-    clearInterval(state.timer);
-    state.timer = setInterval(updateUI, 1000);
+    if (!state) return;
+    if (state.phase !== "active") {
+      ctx.ringStop();
+      state.phase = "active";
+      state.start = Date.now();
+      clearInterval(state.timer);
+      state.timer = setInterval(updateUI, 1000);
+    }
+    state.reconnecting = false;
     updateUI();
   }
 
@@ -104,16 +179,16 @@
     const isVid = state.type === "video";
     const dur = state.phase === "active" ? fmtT(Date.now() - state.start) : "";
 
-    // Üst sohbet barı (küçültüldüğünde veya aktifken)
     if (mini) {
       mini.style.display = "flex";
       mini.className = state.type;
-      const statusTxt =
-        state.phase === "active"
-          ? `${f.n} ile ${isVid ? "görüntülü" : "sesli"} görüşme · ${dur}`
-          : state.dir === "in"
-          ? `${f.n} arıyor…`
-          : `${f.n} aranıyor…`;
+      const statusTxt = state.reconnecting
+        ? `${f.n} · Yeniden bağlanıyor…`
+        : state.phase === "active"
+        ? `${f.n} ile ${isVid ? "görüntülü" : "sesli"} görüşme · ${dur}`
+        : state.dir === "in"
+        ? `${f.n} arıyor…`
+        : `${f.n} aranıyor…`;
       mini.innerHTML = `<span style="cursor:pointer" onclick="RetroCalls.maximize()">${isVid ? "🎥" : "📞"} ${ctx.esc(statusTxt)}</span><button onclick="RetroCalls.hangup()">Bitir</button>`;
     }
 
@@ -126,16 +201,17 @@
 
     $("callAv").innerHTML = ctx.avH(f);
     $("callName").textContent = f.n;
-    $("callSub").textContent =
-      state.phase === "active"
-        ? (isVid ? "Görüntülü görüşme · " : "Sesli görüşme · ") + dur
-        : state.dir === "in"
-        ? isVid
-          ? "Gelen görüntülü arama…"
-          : "Gelen sesli arama…"
-        : isVid
-        ? "Görüntülü aranıyor…"
-        : "Sesli aranıyor…";
+    $("callSub").textContent = state.reconnecting
+      ? "Ağ değişti, yeniden bağlanıyor…"
+      : state.phase === "active"
+      ? (isVid ? "Görüntülü görüşme · " : "Sesli görüşme · ") + dur
+      : state.dir === "in"
+      ? isVid
+        ? "Gelen görüntülü arama…"
+        : "Gelen sesli arama…"
+      : isVid
+      ? "Görüntülü aranıyor…"
+      : "Sesli aranıyor…";
 
     $("cMute").classList.toggle("off", state.muted);
     $("cCam").classList.toggle("off", state.camOff);
@@ -169,6 +245,7 @@
       type,
       dir: "out",
       phase: "ringing",
+      reconnecting: false,
       start: 0,
       timer: null,
       muted: false,
@@ -184,7 +261,7 @@
       lv.play().catch(() => {});
     }
 
-    pc = createPeer(friend.pin);
+    pc = await createPeer(friend.pin);
     localStream.getTracks().forEach((tr) => pc.addTrack(tr, localStream));
 
     const offer = await pc.createOffer();
@@ -221,7 +298,7 @@
       lv.play().catch(() => {});
     }
 
-    pc = createPeer(state.pin);
+    pc = await createPeer(state.pin);
     localStream.getTracks().forEach((tr) => pc.addTrack(tr, localStream));
 
     await pc.setRemoteDescription(new RTCSessionDescription(pendingOffer));
@@ -292,6 +369,7 @@
     remoteStream = null;
     pendingOffer = null;
     pendingIce = [];
+    iceRestarting = false;
     state = null;
 
     if ($("locVid")) $("locVid").srcObject = null;
@@ -367,6 +445,7 @@
           type: ty,
           dir: "in",
           phase: "ringing",
+          reconnecting: false,
           start: 0,
           timer: null,
           muted: false,
@@ -392,6 +471,29 @@
         }
         pendingIce = [];
         onConnected();
+        break;
+      }
+
+      case "call_renegotiate": {
+        if (!state || !pc || state.pin !== fromPin) return;
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(ev.sdp));
+          const ans = await pc.createAnswer();
+          await pc.setLocalDescription(ans);
+          global.RetroTransport.sendRaw({
+            type: "call_renegotiate_answer",
+            to: fromPin,
+            sdp: ans,
+          });
+        } catch (e) {}
+        break;
+      }
+
+      case "call_renegotiate_answer": {
+        if (!state || !pc || state.pin !== fromPin) return;
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(ev.sdp));
+        } catch (e) {}
         break;
       }
 
@@ -444,6 +546,12 @@
     $("cCam").onclick = toggleCam;
     $("cFlip").onclick = flipCam;
     $("cMin").onclick = minimize;
+    // Görüşme sırasında ağ değişirse (Wi-Fi <-> 4G/5G) ICE Restart dene
+    global.addEventListener("online", () => {
+      if (state && state.phase === "active") tryIceRestart();
+    });
+    // ICE listesini önceden önbelleğe al (arama açılışını hızlandırır)
+    loadIceServers();
   }
 
   function isActive() {

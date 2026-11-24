@@ -189,6 +189,8 @@
         case "call_offer":
         case "call_answer":
         case "call_ice":
+        case "call_renegotiate":
+        case "call_renegotiate_answer":
         case "call_end":
         case "call_reject":
         case "call_busy":
@@ -222,6 +224,13 @@
     handlers = opts || {};
     getStateFn = opts.getState || null;
     connect();
+    // Wi-Fi <-> 4G/5G geçişinde beklemeden anında yeniden bağlan
+    global.addEventListener("online", () => {
+      if (config.mode === "ws" && (!ws || ws.readyState !== 1)) {
+        retryDelay = 1500;
+        connect();
+      }
+    });
   }
 
   function isLive() {

@@ -193,9 +193,41 @@ const server = http.createServer((req, res) => {
         onlineUsers: clients.size,
         registeredPins: Object.keys(store.users).length,
         pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
+        turnReady: true,
         uptimeSec: Math.floor(process.uptime()),
       })
     );
+  }
+
+  if (urlPath === "/rtc/ice-servers") {
+    const iceServers = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun.cloudflare.com:3478" },
+    ];
+    if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
+      iceServers.push({
+        urls: process.env.TURN_URL.split(",").map((u) => u.trim()).filter(Boolean),
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_CREDENTIAL,
+      });
+    } else {
+      // Varsayılan ücretsiz OpenRelay TURN yedekleri (4G/5G katı NAT için)
+      iceServers.push(
+        {
+          urls: [
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turn:openrelay.metered.ca:443?transport=tcp",
+            "turns:openrelay.metered.ca:443?transport=tcp",
+          ],
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        }
+      );
+    }
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    return res.end(JSON.stringify({ iceServers }));
   }
 
   if (urlPath === "/push/vapid-public-key") {
@@ -421,10 +453,12 @@ wss.on("connection", (ws) => {
         break;
       }
 
-      // Sesli & Görüntülü Arama Sinyalleşmesi (WebRTC - Faz 3 + Push - Faz 6)
+      // Sesli & Görüntülü Arama Sinyalleşmesi (WebRTC - Faz 3 + Push - Faz 6 + ICE Restart - Faz 7)
       case "call_offer":
       case "call_answer":
       case "call_ice":
+      case "call_renegotiate":
+      case "call_renegotiate_answer":
       case "call_end":
       case "call_reject":
       case "call_busy": {
