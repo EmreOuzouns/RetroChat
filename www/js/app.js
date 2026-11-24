@@ -619,7 +619,56 @@ RetroTransport.init({
   onCallEvent: (ev) => {
     if (window.RetroCalls) RetroCalls.handleEvent(ev);
   },
+  onGameEvent: (ev) => {
+    if (window.RetroGames) RetroGames.handleEvent(ev);
+  },
 });
+
+if (window.RetroGames) {
+  RetroGames.init({
+    getState: () => st,
+    ensureFriendByPin,
+    esc,
+    uid,
+    toast,
+    save,
+    renderMsgs,
+  });
+  const _origStartGame = startGame;
+  startGame = function (k) {
+    if (RetroTransport.isLive()) {
+      const f = st.friends[sel];
+      if (!f) return;
+      RetroGames.invite(f, k);
+      return;
+    }
+    _origStartGame(k);
+  };
+  const _origGbClick = $("gb").onclick;
+  $("gb").onclick = function (e) {
+    if (RetroGames.isActive()) {
+      RetroGames.onBoardClick(e);
+      return;
+    }
+    if (_origGbClick) _origGbClick.call(this, e);
+  };
+  const _origGAgain = $("gAgain").onclick;
+  $("gAgain").onclick = function () {
+    if (RetroGames.isActive()) {
+      RetroGames.rematch();
+      return;
+    }
+    if (_origGAgain) _origGAgain.call(this);
+  };
+  const _origGX = $("gX").onclick;
+  $("gX").onclick = function () {
+    if (RetroGames.isActive()) {
+      RetroGames.end(true);
+      return;
+    }
+    if (_origGX) _origGX.call(this);
+  };
+}
 
 if (window.RetroCalls) {
   RetroCalls.init({
