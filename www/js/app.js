@@ -31,22 +31,25 @@ const avH=f=>f.photo?`<img src="${f.photo}">`:f.e;
 let replyTo=null,typing={};
 const lastOf=f=>{for(let i=f.h.length-1;i>=0;i--)if(!f.h[i].del)return f.h[i];return null};
 const tk=m=>m.me&&m.k!="n"?`<span class="tk ${m.st==2&&st.set.read?"rd":""}"><svg viewBox="0 0 18 10" width="${m.st>=1?18:12}" height="10"><path d="M1 5.5l3 3L10 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>${m.st>=1?'<path d="M7 5.5l3 3L16 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>':""}</svg></span>`:"";
-const colp={on:0,off:0};
-function row(f,i){const l=lastOf(f);const cc=calls[f.pin];const sub=cc&&cc.on?(cc.t=="video"?'<svg class="si" viewBox="0 0 24 24"><rect x="2" y="6" width="13" height="12" rx="2.5" fill="currentColor"/><path d="M16 10l6-3v10l-6-3z" fill="currentColor"/></svg>Görüntülü görüşmede':'<svg class="si" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" fill="currentColor"/></svg>Sesli görüşmede'):typing[f.pin]?'<span style="color:var(--cy)">yazıyor…</span>':l?(l.k=="c"?l.txt:l.k=="n"?"😵‍💫 Titreşim":(l.me?tk(l)+" ":"")+(l.aud?"🎤 Sesli mesaj":l.med?medLabel(l):l.img?"📷 Fotoğraf":l.file?"📄 "+esc(l.file.name):l.loc?"📍 Konum":esc(l.t||""))):(f.np?"🎵 "+esc(f.np):"");return `<div class="c ${i==sel?"sel":""}" onclick="pick(${i})"><div class="av ${stc(f)}" onclick="event.stopPropagation();openPF(${i})">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${sub||"..."}</small></div><div class="cr"><span class="tm">${l&&l.at||""}</span>${f.u?`<span class="bdg">${f.u}</span>`:""}</div><svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`}
+const colp={grp:0,on:0,off:0};
+const grpTyping={};
+function row(f,i){const l=lastOf(f);const cc=calls[f.pin];const sub=cc&&cc.on?(cc.t=="video"?'<svg class="si" viewBox="0 0 24 24"><rect x="2" y="6" width="13" height="12" rx="2.5" fill="currentColor"/><path d="M16 10l6-3v10l-6-3z" fill="currentColor"/></svg>Görüntülü görüşmede':'<svg class="si" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" fill="currentColor"/></svg>Sesli görüşmede'):(f.isGroup&&grpTyping[f.pin])?`<span style="color:var(--cy)">${esc(grpTyping[f.pin])} yazıyor…</span>`:typing[f.pin]?'<span style="color:var(--cy)">yazıyor…</span>':l?(l.k=="c"?l.txt:l.k=="n"?"😵‍💫 Titreşim":(f.isGroup&&!l.me&&l.sn?esc(l.sn)+": ":"")+(l.me?tk(l)+" ":"")+(l.aud?"🎤 Sesli mesaj":l.med?medLabel(l):l.img?"📷 Fotoğraf":l.file?"📄 "+esc(l.file.name):l.loc?"📍 Konum":esc(l.t||""))):(f.isGroup?((f.members||[]).length+" üye"):f.np?"🎵 "+esc(f.np):"");return `<div class="c ${i==sel?"sel":""}" onclick="pick(${i})"><div class="av ${stc(f)}" onclick="event.stopPropagation();openPF(${i})">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${sub||"..."}</small></div><div class="cr"><span class="tm">${l&&l.at||""}</span>${f.u?`<span class="bdg">${f.u}</span>`:""}</div><svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`}
 function tgl(g){colp[g]=!colp[g];renderList()}
-function renderList(){const q=($("q").value||"").toLowerCase();const items=st.friends.map((f,i)=>({f,i})).filter(o=>o.f.n.toLowerCase().includes(q)||o.f.pin.toLowerCase().includes(q));const G=[["on","ONLINE","#00e676",items.filter(o=>o.f.s!="off")],["off","OFFLINE","#8b90b5",items.filter(o=>o.f.s=="off")]];$("list").innerHTML=G.filter(g=>g[3].length).map(g=>{const u=g[3].reduce((n,o)=>n+(o.f.u||0),0);return `<div class="gh" onclick="tgl('${g[0]}')"><span class="gd" style="color:${g[2]};background:${g[2]}"></span> ${g[1]} (${g[3].length})${colp[g[0]]&&u?`<span class="bdg">${u}</span>`:""}<span class="ga">${colp[g[0]]?"▸":"▾"}</span></div>`+(colp[g[0]]?"":g[3].map(o=>row(o.f,o.i)).join(""))}).join("")||'<div style="padding:14px;opacity:.6;font-size:13px">Kişi bulunamadı</div>'}
-function renderMsgs(){const f=st.friends[sel];
+function renderList(){const q=($("q").value||"").toLowerCase();const items=st.friends.map((f,i)=>({f,i})).filter(o=>o.f.n.toLowerCase().includes(q)||o.f.pin.toLowerCase().includes(q));const G=[["grp","GRUPLAR","#c64cff",items.filter(o=>o.f.isGroup)],["on","ONLINE","#00e676",items.filter(o=>!o.f.isGroup&&o.f.s!="off")],["off","OFFLINE","#8b90b5",items.filter(o=>!o.f.isGroup&&o.f.s=="off")]];$("list").innerHTML=G.filter(g=>g[3].length).map(g=>{const u=g[3].reduce((n,o)=>n+(o.f.u||0),0);return `<div class="gh" onclick="tgl('${g[0]}')"><span class="gd" style="color:${g[2]};background:${g[2]}"></span> ${g[1]} (${g[3].length})${colp[g[0]]&&u?`<span class="bdg">${u}</span>`:""}<span class="ga">${colp[g[0]]?"▸":"▾"}</span></div>`+(colp[g[0]]?"":g[3].map(o=>row(o.f,o.i)).join(""))}).join("")||'<div style="padding:14px;opacity:.6;font-size:13px">Kişi bulunamadı</div>'}
+function renderMsgs(){const f=st.friends[sel];if(!f){$("msgs").innerHTML="";renderList();return}
+$("mtS").style.display=f.isGroup?"none":"";$("mtG").style.display=f.isGroup?"none":"";$("mtO").style.display=f.isGroup?"none":"";
 $("cav").className="fr "+stc(f);$("cav").innerHTML=`<div class="fi">${avH(f)}</div>`;
 $("mav").className="fr "+stc(f,1);$("mav").innerHTML=`<div class="fi">${myAv()}</div>`;
-$("hn").textContent=f.n;{const c=calls[f.pin],ca=c&&c.on;$("hst").className=ca?"on":f.s;$("hst").innerHTML='<i class="hdot"></i>'+(ca?(c.t=="video"?"Görüntülü görüşmede":"Sesli görüşmede"):({on:"Çevrimiçi",busy:"Meşgul",off:"Çevrimdışı"})[f.s])}
-$("hs").innerHTML=typing[f.pin]?"yazıyor…":f.np?'<svg class="si" viewBox="0 0 24 24" style="opacity:1"><defs><linearGradient id="npg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4fe3e0"/><stop offset="1" stop-color="var(--t158,#a78bfa)"/></linearGradient></defs><path d="M9 18V6l11-2v12" fill="none" stroke="url(#npg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6.5" cy="18" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/><ellipse cx="17.5" cy="16" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/></svg>Şu an dinliyor: '+esc(f.np):f.s=="off"?"Son görülme: "+esc(f.ls||"yakınlarda"):(f.bio!=null?esc(f.bio):"");$("hp").innerHTML='<svg class="pw" viewBox="0 0 16 16"><path d="M2 8v0M5 5v6M8 3v10M11 6v4M14 8v0" stroke="var(--t159,#7a86d8)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>PIN: '+esc(f.pin)+'<svg class="pc" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+(f.pubKey?'<span class="e2b" title="Uçtan uca şifreli">🔒 E2EE</span>':"");
+$("hn").textContent=f.n;{const c=calls[f.pin],ca=c&&c.on;$("hst").className=f.isGroup?"on":(ca?"on":f.s);$("hst").innerHTML='<i class="hdot"></i>'+(f.isGroup?((f.members||[]).length+" üye"):ca?(c.t=="video"?"Görüntülü görüşmede":"Sesli görüşmede"):({on:"Çevrimiçi",busy:"Meşgul",off:"Çevrimdışı"})[f.s])}
+$("hs").innerHTML=(f.isGroup&&grpTyping[f.pin])?esc(grpTyping[f.pin])+" yazıyor…":typing[f.pin]?"yazıyor…":f.isGroup?esc((f.members||[]).map(x=>x.pin===st.pin?"Sen":x.name).slice(0,5).join(", ")):f.np?'<svg class="si" viewBox="0 0 24 24" style="opacity:1"><defs><linearGradient id="npg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4fe3e0"/><stop offset="1" stop-color="var(--t158,#a78bfa)"/></linearGradient></defs><path d="M9 18V6l11-2v12" fill="none" stroke="url(#npg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="6.5" cy="18" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/><ellipse cx="17.5" cy="16" rx="3" ry="2.4" fill="none" stroke="url(#npg)" stroke-width="2"/></svg>Şu an dinliyor: '+esc(f.np):f.s=="off"?"Son görülme: "+esc(f.ls||"yakınlarda"):(f.bio!=null?esc(f.bio):"");$("hp").innerHTML='<svg class="pw" viewBox="0 0 16 16"><path d="M2 8v0M5 5v6M8 3v10M11 6v4M14 8v0" stroke="var(--t159,#7a86d8)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>'+(f.isGroup?"Grup: ":"PIN: ")+esc(f.pin)+'<svg class="pc" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+(f.pubKey&&!f.isGroup?'<span class="e2b" title="Uçtan uca şifreli">🔒 E2EE</span>':"");
 let html=st.set.timed?'<div class="nd">⏳ Süreli mesajlar açık: 24 saat konuşulmazsa mesajlar herkesten silinir</div>':"",last=null,lastRecv=null;
 f.h.forEach(m=>{if(m.k=="c"){html+=`<div class="nd">${esc(m.txt)}</div>`;last=null;return}if(m.k=="n"){html+=`<div class="nd">${m.me?"Titreşim Gönderdin 😍":"Titreşim Alındı 🤓"}</div>`;last=null;return}
-if(last!==m.me){html+=`<div class="who${m.me?" mine":""}">${esc(m.me?st.set.name:f.n)}:</div>`;last=m.me}
-const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.aud&&window.RetroVoice?RetroVoice.renderHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>")+(m.rx?`<div><span class="rx">${esc(m.rx)}</span></div>`:"");
+if(last!==m.me){html+=`<div class="who${m.me?" mine":""}">${esc(m.me?st.set.name:(m.sn||f.n))}:</div>`;last=m.me}
+const snTag=f.isGroup&&!m.me&&m.sn?`<div class="gsn">${esc(m.sn)}</div>`:"";
+const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':snTag+(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.aud&&window.RetroVoice?RetroVoice.renderHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>")+(m.rx?`<div><span class="rx">${esc(m.rx)}</span></div>`:"");
 html+=`<div class="ml ${m.me?"mine":""}" onclick="menu(event,'${m.id}')"><span class="th">${m.me?myAv():avH(f)}</span><div class="bub"><span class="bl">•</span><span class="bt">${body}</span><i>${m.e2ee&&!m.del?'<span class="elock" title="Uçtan uca şifreli">🔒</span>':""}${m.at}${m.del?"":tk(m)}</i></div></div>`;if(!m.me)lastRecv=m.at});
 if(lastRecv)html+=`<div class="lr">Son alınan ileti zamanı: ${new Date().toLocaleDateString("tr-TR")} - ${lastRecv}.</div>`;
-if(typing[f.pin])html+='<div class="tb"><i></i><i></i><i></i></div>';
+if(typing[f.pin]||(f.isGroup&&grpTyping[f.pin]))html+='<div class="tb"><i></i><i></i><i></i></div>';
 $("msgs").innerHTML=html;$("msgs").scrollTop=1e9;renderList();updCbar()}
 function pick(i){sel=i;st.friends[i].u=0;$("app").classList.add("open");applyBg();save();renderMsgs()}
 $("back").onclick=()=>{$("app").classList.remove("open");applyBg()};
@@ -105,7 +108,7 @@ $("add").onclick=e=>{if(e.target.id=="add"){QR.stopCam();$("add").style.display=
 $("aOk").onclick=()=>{const e=addFriend("",$("aP").value);if(e)return msg(e,0);$("aP").value="";$("add").style.display="none"};
 
 let pfi=0,pfMe=false;
-function openPF(i){pfMe=false;$("pfVis").style.display="none";$("pfGo").style.display="";$("pfGal").style.display="";$("pfCam").style.display="";$("pfNp").style.display="none";$("pfSp").style.display="none";$("pfSpOff").style.display="none";pfi=i;const f=st.friends[i];$("pfa").innerHTML=avH(f)+`<span class="dot ${stc(f)}"></span>`;$("pfa").dataset.st=f.s;$("pfn").textContent=f.n;const ps=$("pfs");ps.textContent=({on:"● Online",busy:"● Meşgul",off:"● Offline"})[f.s]+(f.s=="off"?" · son görülme "+(f.ls||"yakınlarda"):"");ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[f.s];$("pfm").textContent=f.np?"🎵 Şu an dinliyor: "+f.np:"";$("pfBio").value=f.bio!=null?f.bio:"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=f.pin;const secBox=$("pfSec");if(secBox){secBox.style.display="none";if(f.pubKey&&window.RetroCrypto){RetroCrypto.ensureKeyPair(st).then(()=>RetroCrypto.safetyCode(f.pubKey)).then(sc=>{if(sc&&!pfMe&&st.friends[pfi]===f){$("pfSecE").textContent=sc.emojis;$("pfSecC").textContent=sc.code;secBox.style.display=""}}).catch(()=>{})}}$("pf").style.display="flex"}
+function openPF(i){const f=st.friends[i];if(f&&f.isGroup&&window.RetroGroups){RetroGroups.openInfo(f);return}pfMe=false;$("pfVis").style.display="none";$("pfGo").style.display="";$("pfGal").style.display="";$("pfCam").style.display="";$("pfNp").style.display="none";$("pfSp").style.display="none";$("pfSpOff").style.display="none";pfi=i;$("pfa").innerHTML=avH(f)+`<span class="dot ${stc(f)}"></span>`;$("pfa").dataset.st=f.s;$("pfn").textContent=f.n;const ps=$("pfs");ps.textContent=({on:"● Online",busy:"● Meşgul",off:"● Offline"})[f.s]+(f.s=="off"?" · son görülme "+(f.ls||"yakınlarda"):"");ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[f.s];$("pfm").textContent=f.np?"🎵 Şu an dinliyor: "+f.np:"";$("pfBio").value=f.bio!=null?f.bio:"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=f.pin;const secBox=$("pfSec");if(secBox){secBox.style.display="none";if(f.pubKey&&window.RetroCrypto){RetroCrypto.ensureKeyPair(st).then(()=>RetroCrypto.safetyCode(f.pubKey)).then(sc=>{if(sc&&!pfMe&&st.friends[pfi]===f){$("pfSecE").textContent=sc.emojis;$("pfSecC").textContent=sc.code;secBox.style.display=""}}).catch(()=>{})}}$("pf").style.display="flex"}
 $("cav").onclick=()=>openPF(sel);$("mav").onclick=()=>openMyPF();$("myav").onclick=()=>openMyPF();$("mtS").onclick=()=>startCall("voice");$("mtG").onclick=()=>startCall("video");
 function openMyPF(){pfMe=true;if($("pfSec"))$("pfSec").style.display="none";$("pfGal").style.display="none";$("pfCam").style.display="none";const c=st.set,m={on:"● Online",busy:"● Meşgul",off:"● Offline"},ps=$("pfs");$("pfa").innerHTML=myAv()+`<span class="dot ${c.status}"></span>`;$("pfa").dataset.st=c.status;$("pfn").textContent=c.name;ps.textContent=m[c.status]||"";ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[c.status];$("pfm").textContent=c.mus&&c.song?"🎵 Şu an dinliyor: "+c.song:"";$("pfBio").value=c.stx||"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=st.pin;$("pfGo").style.display="none";$("pfNp").style.display="";myNpSync();visSync();$("pf").style.display="flex"}
 $("pfX").onclick=()=>$("pf").style.display="none";$("pfXt").onclick=()=>$("pf").style.display="none";
@@ -256,6 +259,7 @@ let liveT=null;const live=()=>{clearTimeout(liveT);liveT=setTimeout(()=>{readSet
 $("set").addEventListener("input",live);$("set").addEventListener("change",live);
 window.androidBack=function(){
  const sh=$("shs");if(sh){sh.remove();return true}
+ if($("grpInfo")&&$("grpInfo").style.display=="flex"){if(window.RetroGroups)RetroGroups.closeInfo();return true}
  if($("mv")&&$("mv").style.display=="flex"){closeMed();return true}
  if($("mo")&&$("mo").style.display=="flex"){$("moX").click();return true}
  if($("gm")&&$("gm").style.display=="flex"){$("gX").click();return true}
@@ -388,7 +392,7 @@ $("clog").innerHTML=h||'<div style="text-align:center;opacity:.6;padding:40px 0"
 if(!st.calls){const H=36e5,S=[["Zeynep","video","in",432e3,2],["Mehmet","voice","miss",0,5],["Ayşe","voice","out",200e3,27],["Zeynep","voice","noans",0,50]];st.calls=[];S.forEach(a=>{const f=st.friends.find(x=>x.n==a[0]);if(f)st.calls.push({pin:f.pin,t:a[1],dir:a[2],dur:a[3],ts:Date.now()-a[4]*H})});save()}
 const navB=[...document.querySelectorAll("#nav button")];
 const CHV='<svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-function renderPeople(){const q=$("q").value.trim().toLowerCase(),L={on:"Online",busy:"Meşgul",off:"Offline"};const a=st.friends.map((f,i)=>({f,i})).filter(x=>!q||x.f.n.toLowerCase().includes(q)||x.f.pin.toLowerCase().includes(q)).sort((x,y)=>x.f.n.localeCompare(y.f.n,"tr"));
+function renderPeople(){const q=$("q").value.trim().toLowerCase(),L={on:"Online",busy:"Meşgul",off:"Offline"};const a=st.friends.map((f,i)=>({f,i})).filter(x=>!x.f.isGroup&&(!q||x.f.n.toLowerCase().includes(q)||x.f.pin.toLowerCase().includes(q))).sort((x,y)=>x.f.n.localeCompare(y.f.n,"tr"));
 $("clog").innerHTML=`<div class="gh">Kişiler (${a.length})</div>`+(a.map(({f,i})=>`<div class="c" onclick="pick(${i})"><div class="av ${stc(f)}">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${L[f.s]||""} · PIN: ${esc(f.pin)}</small></div>${CHV}</div>`).join("")||'<div style="text-align:center;opacity:.6;padding:40px 0">Kişi bulunamadı</div>')}
 const renderView=()=>cview=="call"?renderCalls():renderPeople();
 function setView(v){cview=v;$("list").style.display=v=="chat"?"":"none";$("clog").style.display=v=="chat"?"none":"";navB.forEach(x=>x.classList.toggle("on",x.dataset.n=={chat:"chat",call:"ntf",ppl:"ppl"}[v]));if(v!="chat")renderView()}
@@ -523,8 +527,11 @@ RetroTransport.init({
       clearTimeout(autoT);
     }
   },
-  onAuthOk: (presences) => {
+  onAuthOk: (presences, groups) => {
     presences.forEach(applyRemoteProfile);
+    if (window.RetroGroups && Array.isArray(groups)) {
+      groups.forEach((g) => RetroGroups.syncGroup(g));
+    }
     save();
     renderList();
     renderMsgs();
@@ -652,6 +659,9 @@ RetroTransport.init({
   onGameEvent: (ev) => {
     if (window.RetroGames) RetroGames.handleEvent(ev);
   },
+  onGroupEvent: (ev) => {
+    if (window.RetroGroups) RetroGroups.handleEvent(ev);
+  },
 });
 
 if (window.RetroGames) {
@@ -757,6 +767,39 @@ if (window.RetroVoice) {
       save();
       renderMsgs();
       RetroTransport.sendMessage(f, m);
+    },
+  });
+}
+
+if (window.RetroGroups) {
+  RetroGroups.init({
+    getState: () => st,
+    getSelectedFriend: () => st.friends[sel],
+    esc,
+    uid,
+    nowTime: t,
+    toast,
+    save,
+    pick,
+    renderList,
+    renderMsgs,
+    notify,
+    shake,
+    setAddError: (txt) => msg(txt, 0),
+    clearVmem: (id) => { delete vmem[id]; },
+    setGroupTyping: (gid, name) => {
+      if (name) grpTyping[gid] = name;
+      else delete grpTyping[gid];
+      renderMsgs();
+    },
+    onGroupRemoved: (removedIdx) => {
+      if (sel === removedIdx) {
+        $("app").classList.remove("open");
+        sel = Math.max(0, Math.min(sel, st.friends.length - 1));
+      } else if (sel > removedIdx) {
+        sel--;
+      }
+      renderMsgs();
     },
   });
 }

@@ -1119,3 +1119,20 @@ body.lt:not(.nt) .e2b{background:rgba(16,185,129,.14);border-color:rgba(16,185,1
 #pfSec .pf-em{font-size:20px;letter-spacing:4px;margin:4px 0}
 #pfSec code{font-size:13px;letter-spacing:1.5px;font-weight:700}
 #pfSec .pf-note{font-size:11px;opacity:.7;margin-top:5px;line-height:1.35}
+
+/* ===== Faz 10: Grup Sohbetleri Arayüzü ===== */
+#gIcons{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+.gic-b{width:34px;height:34px;padding:0!important;border-radius:12px!important;font-size:17px!important;opacity:.7;background:rgba(128,128,180,.18)!important;box-shadow:none!important}
+.gic-b.on{opacity:1;background:linear-gradient(135deg,var(--t28,#8f6bff),var(--t29,#c64cff))!important;box-shadow:0 0 10px rgba(150,90,255,.55)!important}
+#gPickList{max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:4px 0}
+.gp-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 8px;border-radius:12px;background:rgba(128,128,180,.12);cursor:pointer}
+.gp-row small{opacity:.65;font-size:11px}
+#giMembers{max-height:175px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.gm-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:14px;background:rgba(128,128,180,.12);font-size:13px}
+.gm-row code{margin-left:auto;font-size:11px;opacity:.7}
+.gm-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.gm-tag{font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(143,107,255,.25);color:var(--t28,#a85cff);font-weight:700}
+.gsn{font-size:11px;font-weight:700;color:#7fe6ff;margin-bottom:2px}
+body.lt:not(.nt) .gsn{color:var(--t83,#4a55c8)}
+body.lt #grpInfo{background:var(--t96,rgba(40,35,95,.38))!important;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+body.lt.nt #grpInfo{background:rgba(0,0,0,.6)!important}

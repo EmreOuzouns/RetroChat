@@ -24,6 +24,7 @@ let store = {
   pushSubs: {}, // pin -> [ subscription, ... ]
   nativeTokens: {}, // pin -> { token, platform, updatedAt }
   media: {}, // id -> { name, mime, size, owner, createdAt }
+  groups: {}, // groupId -> { id, name, icon, owner, members: [], createdAt }
   vapid: null, // { publicKey, privateKey }
 };
 
@@ -36,6 +37,7 @@ try {
       store.pushSubs = raw.pushSubs || {};
       store.nativeTokens = raw.nativeTokens || {};
       store.media = raw.media || {};
+      store.groups = raw.groups || {};
       store.vapid = raw.vapid || null;
     }
   }
@@ -225,6 +227,37 @@ function publicProfile(pin) {
   };
 }
 
+function groupPayload(g) {
+  if (!g) return null;
+  return {
+    id: g.id,
+    name: g.name,
+    icon: g.icon || "👥",
+    owner: g.owner,
+    members: g.members.map((mp) => {
+      const p = publicProfile(mp);
+      return {
+        pin: mp,
+        name: p ? p.name : "Kişi " + mp.slice(-4),
+        status: p ? p.status : "off",
+        emo: p ? p.emo : "",
+        photo: p ? p.photo : null,
+      };
+    }),
+    createdAt: g.createdAt || Date.now(),
+  };
+}
+
+function listUserGroups(pin) {
+  const out = [];
+  for (const g of Object.values(store.groups)) {
+    if (g && Array.isArray(g.members) && g.members.includes(pin)) {
+      out.push(groupPayload(g));
+    }
+  }
+  return out;
+}
+
 // Yalnızca ilgili PIN'i kişi listesinde barındıran istemcilere presence yayınla (gizlilik & performans)
 function broadcastPresence(pin) {
   const prof = publicProfile(pin);
@@ -286,6 +319,7 @@ const server = http.createServer((req, res) => {
         service: "retrochat-server",
         onlineUsers: clients.size,
         registeredPins: Object.keys(store.users).length,
+        groupsCount: Object.keys(store.groups).length,
         mediaCount: Object.keys(store.media).length,
         pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
         turnReady: true,
@@ -538,10 +572,11 @@ wss.on("connection", (ws) => {
       if (!clients.has(pin)) clients.set(pin, new Set());
       clients.get(pin).add(ws);
 
-      // Arkadaş listesinin güncel durumlarını döndür
+      // Arkadaş listesinin güncel durumlarını ve üye olunan grupları döndür
       const presences = friendPins.map((fp) => publicProfile(fp)).filter(Boolean);
+      const groups = listUserGroups(pin);
 
-      sendJSON(ws, { type: "auth_ok", pin, presences });
+      sendJSON(ws, { type: "auth_ok", pin, presences, groups });
       broadcastPresence(pin);
 
       // Çevrimdışı kuyrukta bekleyen mesaj/olayları teslim et
@@ -709,6 +744,181 @@ wss.on("connection", (ws) => {
           store.nativeTokens = store.nativeTokens || {};
           store.nativeTokens[from] = { token: String(data.token), platform: String(data.platform), updatedAt: Date.now() };
           scheduleSave();
+        }
+        break;
+      }
+
+      // Grup Sohbetleri (Faz 10: Çoklu PIN Odaları)
+      case "group_create": {
+        const gName = String(data.name || "").trim().slice(0, 40);
+        if (!gName) break;
+        const gIcon = String(data.icon || "👥").slice(0, 8);
+        const rawMembers = Array.isArray(data.members) ? data.members : [];
+        const uniq = new Set([from]);
+        for (const mp of rawMembers) {
+          const clean = String(mp || "").trim().toUpperCase();
+          if (/^[0-9A-F]{8}$/.test(clean)) uniq.add(clean);
+        }
+        const members = Array.from(uniq).slice(0, 30);
+        const id = "GRP-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+        const grp = { id, name: gName, icon: gIcon, owner: from, members, createdAt: Date.now() };
+        store.groups[id] = grp;
+        scheduleSave();
+        const payload = groupPayload(grp);
+        for (const mp of members) {
+          sendToPin(mp, { type: "group_sync", group: payload, createdBy: from }, true);
+          if (mp !== from) {
+            sendPushToPin(mp, {
+              kind: "msg",
+              from: id,
+              title: gName,
+              body: `👥 ${senderName(from)} seni "${gName}" grubuna ekledi`,
+            });
+          }
+        }
+        break;
+      }
+
+      case "group_add_member": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const newPin = String(data.pin || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from) || !/^[0-9A-F]{8}$/.test(newPin)) break;
+        if (!grp.members.includes(newPin) && grp.members.length < 30) {
+          grp.members.push(newPin);
+          scheduleSave();
+          const payload = groupPayload(grp);
+          const sysMsg = {
+            k: "c",
+            id: crypto.randomBytes(4).toString("hex"),
+            txt: `👥 ${senderName(from)}, ${senderName(newPin)} kişisini gruba ekledi`,
+            ts: Date.now(),
+          };
+          for (const mp of grp.members) {
+            sendToPin(mp, { type: "group_sync", group: payload }, true);
+            sendToPin(mp, { type: "group_msg", groupId: gid, from, senderName: senderName(from), msg: sysMsg }, true);
+          }
+          sendPushToPin(newPin, {
+            kind: "msg",
+            from: gid,
+            title: grp.name,
+            body: `👥 ${senderName(from)} seni "${grp.name}" grubuna ekledi`,
+          });
+        }
+        break;
+      }
+
+      case "group_leave": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from)) break;
+        grp.members = grp.members.filter((mp) => mp !== from);
+        if (grp.members.length === 0) {
+          delete store.groups[gid];
+        } else {
+          if (grp.owner === from) grp.owner = grp.members[0];
+          const payload = groupPayload(grp);
+          const sysMsg = {
+            k: "c",
+            id: crypto.randomBytes(4).toString("hex"),
+            txt: `👋 ${senderName(from)} gruptan ayrıldı`,
+            ts: Date.now(),
+          };
+          for (const mp of grp.members) {
+            sendToPin(mp, { type: "group_sync", group: payload }, true);
+            sendToPin(mp, { type: "group_msg", groupId: gid, from, senderName: senderName(from), msg: sysMsg }, true);
+          }
+        }
+        scheduleSave();
+        sendJSON(ws, { type: "group_removed", groupId: gid });
+        break;
+      }
+
+      case "group_msg": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from) || !data.msg) break;
+        const sName = senderName(from);
+        const m = data.msg;
+        let anyDelivered = false;
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          const ok = sendToPin(
+            mp,
+            { type: "group_msg", groupId: gid, from, senderName: sName, msg: m, timed: !!data.timed },
+            true
+          );
+          if (ok) anyDelivered = true;
+          const preview = m.aud
+            ? "🎤 Sesli mesaj"
+            : m.med
+            ? (m.med.mode === "once" ? "👁 Tek seferlik medya" : m.med.k === "vid" ? "🎞 Video" : "📷 Fotoğraf")
+            : m.img ? "📷 Fotoğraf"
+            : m.file ? "📄 " + (m.file.name || "Dosya")
+            : m.loc ? "📍 Konum"
+            : String(m.t || "Yeni mesaj").slice(0, 100);
+          sendPushToPin(mp, {
+            kind: "msg",
+            from: gid,
+            title: `${grp.icon || "👥"} ${grp.name}`,
+            body: `${sName}: ${preview}`,
+          });
+        }
+        if (anyDelivered && m.id) {
+          sendJSON(ws, { type: "delivered", from: gid, msgId: m.id });
+        }
+        break;
+      }
+
+      case "group_nudge": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from)) break;
+        const sName = senderName(from);
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          sendToPin(mp, { type: "group_nudge", groupId: gid, from, senderName: sName, at: Date.now() }, true);
+          sendPushToPin(mp, {
+            kind: "nudge",
+            from: gid,
+            title: `${grp.icon || "👥"} ${grp.name}`,
+            body: `🫨 ${sName} gruba titreşim gönderdi!`,
+          });
+        }
+        break;
+      }
+
+      case "group_typing": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from)) break;
+        const sName = senderName(from);
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          sendToPin(mp, { type: "group_typing", groupId: gid, from, senderName: sName, isTyping: !!data.isTyping }, false);
+        }
+        break;
+      }
+
+      case "group_reaction": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from) || !data.msgId) break;
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          sendToPin(mp, { type: "group_reaction", groupId: gid, from, msgId: data.msgId, emoji: data.emoji || "" }, true);
+        }
+        break;
+      }
+
+      case "group_delete": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from) || !data.msgId) break;
+        if (data.mediaId) deleteMediaById(data.mediaId);
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          sendToPin(mp, { type: "group_delete", groupId: gid, from, msgId: data.msgId }, true);
         }
         break;
       }

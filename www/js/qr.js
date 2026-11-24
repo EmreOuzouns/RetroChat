@@ -101,8 +101,9 @@
     }
 
     function tab(k) {
-      ["P", "Q", "M"].forEach((x) => {
-        $("v" + x).style.display = x === k ? "block" : "none";
+      ["P", "Q", "M", "G"].forEach((x) => {
+        const vw = $("v" + x);
+        if (vw) vw.style.display = x === k ? "block" : "none";
         const btn = $("t" + x);
         if (btn) btn.classList.toggle("on", x === k);
       });
@@ -115,11 +116,15 @@
         $("myqr").innerHTML = qrHTML(st.pin, st.set.name);
         $("myqp").textContent = st.pin;
       }
+      if (k === "G" && global.RetroGroups) {
+        global.RetroGroups.renderCreateUI();
+      }
     }
 
     $("tP").onclick = () => tab("P");
     $("tQ").onclick = () => tab("Q");
     $("tM").onclick = () => tab("M");
+    if ($("tG")) $("tG").onclick = () => tab("G");
     $("qx").onclick = closeQR;
     $("qrm").onclick = (e) => {
       if (e.target.id === "qrm") closeQR();

@@ -158,7 +158,7 @@
         case "auth_ok":
           authed = true;
           if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin);
-          if (handlers.onAuthOk) handlers.onAuthOk(data.presences || []);
+          if (handlers.onAuthOk) handlers.onAuthOk(data.presences || [], data.groups || []);
           flushOutbox();
           break;
         case "auth_error":
@@ -233,6 +233,15 @@
         case "reaction":
           if (handlers.onReaction) handlers.onReaction(data.from, data.msgId, data.emoji || "");
           break;
+        case "group_sync":
+        case "group_removed":
+        case "group_msg":
+        case "group_nudge":
+        case "group_typing":
+        case "group_reaction":
+        case "group_delete":
+          if (handlers.onGroupEvent) handlers.onGroupEvent(data);
+          break;
         case "game_invite":
         case "game_accept":
         case "game_decline":
@@ -305,6 +314,15 @@
   async function sendMessage(friend, msg) {
     if (config.mode === "ws") {
       const st = getStateFn ? getStateFn() : null;
+      if (friend && friend.isGroup) {
+        rawSend({
+          type: "group_msg",
+          groupId: friend.pin,
+          msg: Object.assign({}, msg),
+          timed: !!(st && st.set && st.set.timed),
+        });
+        return;
+      }
       let wireMsg = Object.assign({}, msg);
       if (global.RetroCrypto && friend && friend.pubKey && global.RetroCrypto.validPubJwk(friend.pubKey)) {
         try {
@@ -346,7 +364,11 @@
 
   function sendNudge(friend) {
     if (config.mode === "ws") {
-      rawSend({ type: "nudge", to: friend.pin });
+      if (friend && friend.isGroup) {
+        rawSend({ type: "group_nudge", groupId: friend.pin });
+      } else {
+        rawSend({ type: "nudge", to: friend.pin });
+      }
       return;
     }
     if (handlers.onLocalDeliver) {
@@ -356,11 +378,15 @@
 
   function sendTyping(friend, isTyping) {
     if (config.mode !== "ws" || !friend) return;
+    if (friend.isGroup) {
+      rawSend({ type: "group_typing", groupId: friend.pin, isTyping: !!isTyping });
+      return;
+    }
     rawSend({ type: "typing", to: friend.pin, isTyping: !!isTyping });
   }
 
   function sendRead(friend, msgIds) {
-    if (config.mode !== "ws" || !friend || !msgIds || !msgIds.length) return;
+    if (config.mode !== "ws" || !friend || friend.isGroup || !msgIds || !msgIds.length) return;
     rawSend({ type: "read", to: friend.pin, msgIds });
   }
 
@@ -407,16 +433,24 @@
 
   function deleteForAll(friend, msgId, mediaId) {
     if (config.mode !== "ws" || !friend) return;
+    if (friend.isGroup) {
+      rawSend({ type: "group_delete", groupId: friend.pin, msgId, mediaId: mediaId || undefined });
+      return;
+    }
     rawSend({ type: "delete_for_all", to: friend.pin, msgId, mediaId: mediaId || undefined });
   }
 
   function sendMediaOpened(friend, msgId, mediaId) {
-    if (config.mode !== "ws" || !friend) return;
+    if (config.mode !== "ws" || !friend || friend.isGroup) return;
     rawSend({ type: "media_opened", to: friend.pin, msgId, mediaId: mediaId || undefined });
   }
 
   function sendReaction(friend, msgId, emoji) {
     if (config.mode !== "ws" || !friend) return;
+    if (friend.isGroup) {
+      rawSend({ type: "group_reaction", groupId: friend.pin, msgId, emoji: emoji || "" });
+      return;
+    }
     rawSend({ type: "reaction", to: friend.pin, msgId, emoji: emoji || "" });
   }
 

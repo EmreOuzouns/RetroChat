@@ -1,5 +1,5 @@
 /* RetroChat Service Worker — PWA + Arka Plan Web Push Bildirimleri (Mesaj, Nudge, Arama) */
-const CACHE = "retrochat-v4";
+const CACHE = "retrochat-v5";
 const ASSETS = [
   "/",
   "/index.html",
@@ -14,6 +14,7 @@ const ASSETS = [
   "/js/games.js",
   "/js/push.js",
   "/js/voice.js",
+  "/js/groups.js",
   "/js/native.js",
   "/js/app.js",
   "/icons/icon.svg",
