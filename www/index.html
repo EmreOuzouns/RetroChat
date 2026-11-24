@@ -21,7 +21,7 @@
   <div class="me"><div class="row"><div class="av" id="myav"><span id="myph">😎</span><span class="dot on" id="mydot"></span></div><div class="mi"><b id="myname">Ahmet</b><small>PIN: <span id="mypin"></span><button id="cpy" aria-label="PIN kopyala"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><button id="shr" aria-label="PIN paylaş"><svg viewBox="0 0 24 24"><path d="M12 15V3M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></small></div></div>
   <div class="np"><span id="npi"></span><input id="np" maxlength="60" placeholder="Durumunu yaz…" autocomplete="off"><button id="npm" title="Dinlediğim müziği durum yap" aria-label="Müzik durumu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" stroke="none"/><path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3.5M9 20.5h6"/><path d="M3.2 8.5c-1 2-1 4.5 0 6.5M20.8 8.5c1 2 1 4.5 0 6.5" stroke-width="1.5"/><path d="M5.2 10c-.5 1.2-.5 2.8 0 4M18.8 10c.5 1.2.5 2.8 0 4" stroke-width="1.5"/></svg></button><button id="addb" class="rb pl" title="PIN ile kişi ekle" aria-label="Kişi ekle"></button></div></div>
  </div>
- <div id="lb"><div class="sr"><div class="sw"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><input id="q" placeholder="Ara..."></div><button id="spk" aria-label="Ara"><svg viewBox="0 0 24 24"><path d="M13 2l2.2 6.8L22 11l-6.8 2.2L13 20l-2.2-6.8L4 11l6.8-2.2z" fill="url(#gA)"/><path d="M5 16l.9 2.1L8 19l-2.1.9L5 22l-.9-2.1L2 19l2.1-.9z" fill="url(#gA)"/></svg></button></div><div id="list"></div><div id="clog" style="display:none"></div></div>
+ <div id="lb"><div class="sr"><div class="sw"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><input id="q" placeholder="Ara..."></div><button id="spk" aria-label="Ara"><svg viewBox="0 0 24 24"><path d="M13 2l2.2 6.8L22 11l-6.8 2.2L13 20l-2.2-6.8L4 11l6.8-2.2z" fill="url(#gA)"/><path d="M5 16l.9 2.1L8 19l-2.1.9L5 22l-.9-2.1L2 19l2.1-.9z" fill="url(#gA)"/></svg></button></div><button id="pushBar" type="button" style="display:none">🔔 Bildirimleri Aç — kapalıyken mesaj & arama gelsin</button><div id="list"></div><div id="clog" style="display:none"></div></div>
  <div id="status"></div>
  
  <nav id="nav">
@@ -92,6 +92,8 @@
 <div class="wp-h">Çerçeve rengi</div><div id="fcPrev"><span id="fcTx"><b>Çerçeve önizleme</b><small>Seçtiğin renk çerçevelerin içini boyar</small></span></div><div id="fcName"></div><div id="fcGrid"></div>
 </div>
 <div class="spg" id="spg-snd" style="display:none">
+<div class="s">Arka plan bildirimleri<button type="button" id="sPushBtn" style="padding:6px 12px;font-size:12px">🔔 Bildirimleri Aç</button></div>
+<div id="sPushNote" style="font-size:11px;opacity:.65;padding:4px 0 8px"></div>
 <div class="s">Ses<input type="checkbox" id="sSound"></div>
 <div class="s">Ses seviyesi<input type="range" id="sVol" min="0" max="100"></div>
 <div class="s">Ekran sallanması<input type="checkbox" id="sShake"></div>
@@ -143,6 +145,7 @@
 <script defer src="js/qr.js"></script>
 <script defer src="js/webrtc.js"></script>
 <script defer src="js/games.js"></script>
+<script defer src="js/push.js"></script>
 <script defer src="js/native.js"></script>
 <script defer src="js/app.js"></script>
 </body></html>

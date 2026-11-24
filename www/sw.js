@@ -1,5 +1,5 @@
-/* RetroChat Service Worker — Android Chrome WebAPK & iOS PWA kurulumu için */
-const CACHE = "retrochat-v1";
+/* RetroChat Service Worker — PWA + Arka Plan Web Push Bildirimleri (Mesaj, Nudge, Arama) */
+const CACHE = "retrochat-v2";
 const ASSETS = [
   "/",
   "/index.html",
@@ -31,7 +31,7 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
-  // Network-first: her zaman en güncel sürümü al, çevrimdışıysa önbellekten dön
+  if (url.pathname.startsWith("/push/") || url.pathname === "/health") return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -42,5 +42,70 @@ self.addEventListener("fetch", (e) => {
         return res;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+/* ===== Arka Plan Push Bildirimleri (Uygulama Kapalıyken) ===== */
+self.addEventListener("push", (e) => {
+  let data = { kind: "msg", title: "RetroChat", body: "Yeni bildirim", from: "" };
+  try {
+    if (e.data) data = Object.assign(data, e.data.json());
+  } catch (err) {
+    if (e.data) data.body = e.data.text();
+  }
+
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((winList) => {
+      // Uygulama şu an kullanıcı tarafından aktif/odaklı görüntüleniyorsa push spam'i yapma
+      const focused = winList.some((w) => w.focused && w.visibilityState === "visible");
+      if (focused && data.kind !== "call") return;
+
+      const isCall = data.kind === "call";
+      const isNudge = data.kind === "nudge";
+
+      const opts = {
+        body: data.body || "Yeni mesaj",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: isCall ? "rc-call-" + data.from : isNudge ? "rc-nudge-" + data.from : "rc-msg-" + data.from,
+        renotify: true,
+        requireInteraction: isCall,
+        vibrate: isCall
+          ? [500, 200, 500, 200, 500, 200, 500]
+          : isNudge
+          ? [300, 100, 300, 100, 300, 100, 500]
+          : [160, 80, 160],
+        data: { from: data.from || "", kind: data.kind || "msg" },
+      };
+
+      if (isCall) {
+        opts.actions = [
+          { action: "open", title: "📞 Aç / Cevapla" },
+          { action: "dismiss", title: "Kapat" },
+        ];
+      }
+
+      return self.registration.showNotification(data.title || "RetroChat", opts);
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  if (e.action === "dismiss") return;
+
+  const from = (e.notification.data && e.notification.data.from) || "";
+  const targetUrl = from ? "/?chat=" + encodeURIComponent(from) : "/";
+
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((winList) => {
+      for (const w of winList) {
+        if (w.url.startsWith(self.location.origin) && "focus" in w) {
+          w.postMessage({ type: "open_chat", from });
+          return w.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
   );
 });

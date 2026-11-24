@@ -512,6 +512,7 @@ RetroTransport.init({
     save();
     renderList();
     renderMsgs();
+    if (window.RetroPush) RetroPush.sync();
   },
   onPinTaken: () => {
     RetroTransport.regeneratePin(st);
@@ -693,6 +694,23 @@ if (window.RetroCalls) {
       return;
     }
     _origStartCall(ty);
+  };
+}
+
+if (window.RetroPush) {
+  RetroPush.init({
+    toast,
+    openByPin: (pin) => {
+      const f = ensureFriendByPin(pin);
+      const idx = st.friends.indexOf(f);
+      if (idx >= 0) pick(idx);
+    },
+  });
+  const _origRenderListPush = renderList;
+  renderList = function () {
+    _origRenderListPush();
+    const totalUnread = st.friends.reduce((n, f) => n + (f.u || 0), 0);
+    RetroPush.updateBadge(totalUnread);
   };
 }
 

@@ -2,6 +2,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
+let webpush = null;
+try { webpush = require("web-push"); } catch (e) {}
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
@@ -11,10 +13,12 @@ const MAX_PAYLOAD = 35 * 1024 * 1024; // 35 MB (video/dosya için)
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-// Kalıcı depo: kullanıcı PIN + token + profil + çevrimdışı kuyruk
+// Kalıcı depo: kullanıcı PIN + token + profil + çevrimdışı kuyruk + push abonelikleri + VAPID
 let store = {
-  users: {}, // pin -> { token, profile: { name, status, stx, song, mus, emo, anim, photo, stxVis }, lastSeen }
+  users: {}, // pin -> { token, profile, lastSeen }
   queue: {}, // toPin -> [ { ...event, queuedAt } ]
+  pushSubs: {}, // pin -> [ subscription, ... ]
+  vapid: null, // { publicKey, privateKey }
 };
 
 try {
@@ -23,10 +27,53 @@ try {
     if (raw && typeof raw === "object") {
       store.users = raw.users || {};
       store.queue = raw.queue || {};
+      store.pushSubs = raw.pushSubs || {};
+      store.vapid = raw.vapid || null;
     }
   }
 } catch (e) {
   console.error("Store load error:", e.message);
+}
+
+// Kalıcı VAPID anahtarları (Web Push için)
+if (webpush) {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    store.vapid = {
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY,
+    };
+  } else if (!store.vapid || !store.vapid.publicKey || !store.vapid.privateKey) {
+    store.vapid = webpush.generateVAPIDKeys();
+    try { fs.writeFileSync(STORE_PATH, JSON.stringify(store), "utf8"); } catch (e) {}
+  }
+  webpush.setVapidDetails(
+    "mailto:retrochat@retrochat.app",
+    store.vapid.publicKey,
+    store.vapid.privateKey
+  );
+}
+
+// Çevrimdışı kullanıcıya arama geldiğinde 35 sn beklet (bildirime tıklayıp açınca yakalasın)
+const pendingCalls = new Map(); // toPin -> { offer, ice: [], expiresAt }
+
+function sendPushToPin(pin, payload) {
+  if (!webpush || !store.vapid) return;
+  const subs = store.pushSubs[pin];
+  if (!subs || !subs.length) return;
+  const body = JSON.stringify(payload);
+  subs.forEach((sub, idx) => {
+    webpush.sendNotification(sub, body, { TTL: payload.kind === "call" ? 45 : 86400, urgency: "high" }).catch((err) => {
+      if (err && (err.statusCode === 404 || err.statusCode === 410)) {
+        store.pushSubs[pin] = (store.pushSubs[pin] || []).filter((s) => s.endpoint !== sub.endpoint);
+        scheduleSave();
+      }
+    });
+  });
+}
+
+function senderName(pin) {
+  const u = store.users[pin];
+  return (u && u.profile && u.profile.name) || ("Kişi " + pin.slice(-4));
 }
 
 let saveTimer = null;
@@ -145,8 +192,16 @@ const server = http.createServer((req, res) => {
         service: "retrochat-server",
         onlineUsers: clients.size,
         registeredPins: Object.keys(store.users).length,
+        pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
         uptimeSec: Math.floor(process.uptime()),
       })
+    );
+  }
+
+  if (urlPath === "/push/vapid-public-key") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(
+      JSON.stringify({ publicKey: store.vapid ? store.vapid.publicKey : null })
     );
   }
 
@@ -239,6 +294,14 @@ wss.on("connection", (ws) => {
           }
         }
       }
+
+      // Bekleyen gelen arama varsa (bildirimle açıldıysa) hemen ilet
+      const pc = pendingCalls.get(pin);
+      if (pc && pc.expiresAt > Date.now()) {
+        pendingCalls.delete(pin);
+        sendJSON(ws, pc.offer);
+        for (const ice of pc.ice) sendJSON(ws, ice);
+      }
       return;
     }
 
@@ -270,6 +333,26 @@ wss.on("connection", (ws) => {
         break;
       }
 
+      case "push_subscribe": {
+        const sub = data.subscription;
+        if (sub && sub.endpoint) {
+          const list = (store.pushSubs[from] || []).filter((s) => s.endpoint !== sub.endpoint);
+          list.push(sub);
+          store.pushSubs[from] = list.slice(-5);
+          scheduleSave();
+          sendJSON(ws, { type: "push_ok" });
+        }
+        break;
+      }
+
+      case "push_unsubscribe": {
+        if (data.endpoint && store.pushSubs[from]) {
+          store.pushSubs[from] = store.pushSubs[from].filter((s) => s.endpoint !== data.endpoint);
+          scheduleSave();
+        }
+        break;
+      }
+
       case "msg": {
         if (!to || !data.msg) break;
         const delivered = sendToPin(
@@ -280,12 +363,26 @@ wss.on("connection", (ws) => {
         if (delivered && data.msg.id) {
           sendJSON(ws, { type: "delivered", from: to, msgId: data.msg.id });
         }
+        const m = data.msg;
+        const preview = m.med
+          ? (m.med.mode === "once" ? "👁 Tek seferlik medya" : m.med.k === "vid" ? "🎞 Video" : "📷 Fotoğraf")
+          : m.img ? "📷 Fotoğraf"
+          : m.file ? "📄 " + (m.file.name || "Dosya")
+          : m.loc ? "📍 Konum"
+          : String(m.t || "Yeni mesaj").slice(0, 120);
+        sendPushToPin(to, { kind: "msg", from, title: senderName(from), body: preview });
         break;
       }
 
       case "nudge": {
         if (!to) break;
         sendToPin(to, { type: "nudge", from, at: Date.now() }, true);
+        sendPushToPin(to, {
+          kind: "nudge",
+          from,
+          title: senderName(from),
+          body: "🫨 Sana titreşim gönderdi!",
+        });
         break;
       }
 
@@ -324,7 +421,7 @@ wss.on("connection", (ws) => {
         break;
       }
 
-      // Sesli & Görüntülü Arama Sinyalleşmesi (WebRTC - Faz 3)
+      // Sesli & Görüntülü Arama Sinyalleşmesi (WebRTC - Faz 3 + Push - Faz 6)
       case "call_offer":
       case "call_answer":
       case "call_ice":
@@ -332,9 +429,29 @@ wss.on("connection", (ws) => {
       case "call_reject":
       case "call_busy": {
         if (!to) break;
-        const ok = sendToPin(to, { ...data, from }, false);
-        if (!ok && data.type === "call_offer") {
-          sendJSON(ws, { type: "call_offline", from: to });
+        const evPayload = { ...data, from };
+        const ok = sendToPin(to, evPayload, false);
+        if (data.type === "call_offer") {
+          const isVid = data.callType === "video";
+          sendPushToPin(to, {
+            kind: "call",
+            from,
+            callType: isVid ? "video" : "voice",
+            title: senderName(from),
+            body: isVid ? "🎥 Görüntülü arıyor…" : "📞 Sesli arıyor…",
+          });
+          if (!ok) {
+            const hasPush = !!(store.pushSubs[to] && store.pushSubs[to].length);
+            if (hasPush) {
+              pendingCalls.set(to, { offer: evPayload, ice: [], expiresAt: Date.now() + 35000 });
+            } else {
+              sendJSON(ws, { type: "call_offline", from: to });
+            }
+          }
+        } else if (data.type === "call_ice" && !ok && pendingCalls.has(to)) {
+          pendingCalls.get(to).ice.push(evPayload);
+        } else if (data.type === "call_end" && pendingCalls.has(to)) {
+          pendingCalls.delete(to);
         }
         break;
       }
