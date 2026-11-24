@@ -287,14 +287,55 @@
     rawSend({ type: "read", to: friend.pin, msgIds });
   }
 
-  function deleteForAll(friend, msgId) {
-    if (config.mode !== "ws" || !friend) return;
-    rawSend({ type: "delete_for_all", to: friend.pin, msgId });
+  function getHttpBase() {
+    const state = getStateFn ? getStateFn() : null;
+    const wsUrl = resolveServerUrl(state);
+    if (wsUrl) {
+      return wsUrl.replace(/^wss:/, "https:").replace(/^ws:/, "http:").replace(/\/$/, "");
+    }
+    if (location && /^https?:$/.test(location.protocol) && location.origin) {
+      return location.origin;
+    }
+    return "https://retrochat-server-production.up.railway.app";
   }
 
-  function sendMediaOpened(friend, msgId) {
+  async function uploadMedia(blob, fileName, mimeType) {
+    const st = getStateFn ? getStateFn() : null;
+    if (!st) throw new Error("Durum bulunamadı");
+    ensureIdentity(st);
+    const base = getHttpBase();
+    const res = await fetch(base + "/media/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": mimeType || (blob && blob.type) || "application/octet-stream",
+        "X-Pin": st.pin,
+        "X-Token": st.authToken,
+        "X-File-Name": encodeURIComponent(fileName || "dosya"),
+        "X-File-Type": mimeType || (blob && blob.type) || "application/octet-stream",
+      },
+      body: blob,
+    });
+    if (!res.ok) {
+      let msg = "Yükleme başarısız";
+      try {
+        const j = await res.json();
+        if (j && j.error) msg = j.error;
+      } catch (e) {}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    const absUrl = /^https?:/.test(data.url) ? data.url : base + data.url;
+    return { id: data.id, url: absUrl, size: data.size };
+  }
+
+  function deleteForAll(friend, msgId, mediaId) {
     if (config.mode !== "ws" || !friend) return;
-    rawSend({ type: "media_opened", to: friend.pin, msgId });
+    rawSend({ type: "delete_for_all", to: friend.pin, msgId, mediaId: mediaId || undefined });
+  }
+
+  function sendMediaOpened(friend, msgId, mediaId) {
+    if (config.mode !== "ws" || !friend) return;
+    rawSend({ type: "media_opened", to: friend.pin, msgId, mediaId: mediaId || undefined });
   }
 
   function sendReaction(friend, msgId, emoji) {
@@ -311,6 +352,8 @@
     init,
     connect,
     isLive,
+    getHttpBase,
+    uploadMedia,
     randomHex,
     ensureIdentity,
     regeneratePin,

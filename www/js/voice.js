@@ -104,7 +104,7 @@
     if (!recording || !recorder) return;
     const dur = fmtSec(Date.now() - startTs);
     const mime = recorder.mimeType || "audio/webm";
-    recorder.onstop = () => {
+    recorder.onstop = async () => {
       const blob = new Blob(chunks, { type: mime });
       chunks = [];
       stopTracks();
@@ -112,6 +112,21 @@
       if (blob.size > 8 * 1024 * 1024) {
         ctx.toast("Ses kaydı çok uzun (en fazla 8 MB)");
         return;
+      }
+      // Canlı modda sunucuya HTTP stream yükle (localStorage kotasını doldurmaz)
+      if (global.RetroTransport && global.RetroTransport.isLive() && global.RetroTransport.uploadMedia) {
+        try {
+          ctx.toast("Sesli mesaj gönderiliyor…");
+          const ext = /mp4|aac/.test(mime) ? "m4a" : /ogg/.test(mime) ? "ogg" : "webm";
+          const up = await global.RetroTransport.uploadMedia(blob, "sesli-mesaj." + ext, mime);
+          ctx.onVoiceReady({ src: up.url, dur, mime, mediaId: up.id });
+          return;
+        } catch (e) {
+          if (blob.size > 1.5 * 1024 * 1024) {
+            ctx.toast("Sesli mesaj yüklenemedi: " + (e.message || "bağlantı hatası"));
+            return;
+          }
+        }
       }
       const reader = new FileReader();
       reader.onload = () => {

@@ -7,7 +7,7 @@ RetroTransport.ensureIdentity(st);
 let _nT=null,_iT=null;
 function nativeFlush(){clearTimeout(_nT);_nT=null;if(window.ReactNativeWebView){try{window.ReactNativeWebView.postMessage(JSON.stringify({type:"state",data:JSON.stringify(st)}))}catch(e){}}}
 function idbSave(str){try{const r=indexedDB.open("rc",1);r.onupgradeneeded=()=>r.result.createObjectStore("s");r.onsuccess=()=>{try{r.result.transaction("s","readwrite").objectStore("s").put(str,"st")}catch(e){}}}catch(e){}}
-const save=()=>{try{const n=Date.now();st.friends.forEach(f=>f.h.forEach(m=>{if(!m.ts)m.ts=n}))}catch(e){}st._t=Date.now();let str="";try{str=JSON.stringify(st)}catch(e){return}try{localStorage.setItem("rc",str)}catch(e){}clearTimeout(_iT);_iT=setTimeout(()=>idbSave(str),400);if(window.ReactNativeWebView){clearTimeout(_nT);_nT=setTimeout(nativeFlush,250)}};
+const save=()=>{try{const n=Date.now();st.friends.forEach(f=>f.h.forEach(m=>{if(!m.ts)m.ts=n}))}catch(e){}st._t=Date.now();let str="";try{str=JSON.stringify(st)}catch(e){return}try{localStorage.setItem("rc",str)}catch(e){try{const slim=JSON.stringify(st,(k,v)=>(typeof v==="string"&&v.startsWith("data:")&&v.length>80000?null:v));localStorage.setItem("rc",slim)}catch(_){}}clearTimeout(_iT);_iT=setTimeout(()=>idbSave(str),400);if(window.ReactNativeWebView){clearTimeout(_nT);_nT=setTimeout(nativeFlush,250)}};
 window.addEventListener("pagehide",()=>{save();nativeFlush()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){save();nativeFlush()}});
 st.set=Object.assign({name:"Ahmet",status:"on",sound:true,vol:60,shake:true,int:100,vib:true,read:true,col:"#00e5ff",stx:"Ay dolar gecelerine",song:"Queen - Bohemian Rhapsody",mus:false},st.set||{});st.friends.forEach(f=>f.h.forEach(m=>{if(!m.id)m.id=uid();if(m.me&&m.st==null)m.st=2}));let sel=0;$("mypin").textContent=st.pin;
@@ -24,7 +24,7 @@ const calls={};
 const stc=(f,own)=>{const c=calls[f.pin];return c&&c.on?(c.t=="video"?"vid":"voi"):(own?st.set.status:f.s)};
 const fmtT=ms=>{const q=Math.floor(ms/1000);return String(Math.floor(q/60)).padStart(2,"0")+":"+String(q%60).padStart(2,"0")};
 function toast(x){const e=$("toast");e.textContent=x;e.style.opacity=1;clearTimeout(toast.h);toast.h=setTimeout(()=>e.style.opacity=0,2200)}
-function updCbar(){const f=st.friends[sel],c=calls[f.pin],b=$("cbar");$("mtS").classList.toggle("act",!!c&&c.t=="voice");$("mtG").classList.toggle("act",!!c&&c.t=="video");if(!c){b.style.display="none";return}b.style.display="flex";b.className=c.t;const v=c.t=="video";b.innerHTML=`<span>${v?"🎥":"📞"} ${c.on?esc(f.n)+" ile "+(v?"görüntülü":"sesli")+" görüşme · "+fmtT(Date.now()-c.start):esc(f.n)+" aranıyor…"}</span><button onclick="endCall(st.friends[sel])">Bitir</button>`}
+function updCbar(){const f=st.friends[sel];if(window.RetroCalls&&RetroCalls.isActive()){const ci=RetroCalls.getCallInfo?RetroCalls.getCallInfo():null;$("mtS").classList.toggle("act",!!ci&&ci.type=="voice"&&f&&ci.pin==f.pin);$("mtG").classList.toggle("act",!!ci&&ci.type=="video"&&f&&ci.pin==f.pin);if(RetroCalls.syncBar)RetroCalls.syncBar();return}const c=f&&calls[f.pin],b=$("cbar");$("mtS").classList.toggle("act",!!c&&c.t=="voice");$("mtG").classList.toggle("act",!!c&&c.t=="video");if(!c){b.style.display="none";return}b.style.display="flex";b.className=c.t;const v=c.t=="video";b.innerHTML=`<span>${v?"🎥":"📞"} ${c.on?esc(f.n)+" ile "+(v?"görüntülü":"sesli")+" görüşme · "+fmtT(Date.now()-c.start):esc(f.n)+" aranıyor…"}</span><button onclick="endCall(st.friends[sel])">Bitir</button>`}
 function endCall(f){const c=calls[f.pin];if(!c)return;ringStop();clearInterval(c.iv);delete calls[f.pin];if(c.on){f.h.push({k:"c",id:uid(),txt:(c.t=="video"?"🎥 Görüntülü":"📞 Sesli")+" görüşme sona erdi · "+fmtT(Date.now()-c.start)});logCall(f,c.t,"out",Date.now()-c.start,c.start);save()}else logCall(f,c.t,"noans");renderMsgs()}
 function startCall(ty){const f=st.friends[sel],c=calls[f.pin];if(c&&c.t==ty){endCall(f);return}if(c)endCall(f);if(f.s=="off"){logCall(f,ty,"noans");return toast(f.n+" offline, aranamaz")};if(f.s=="busy"){logCall(f,ty,"noans");return toast(f.n+" meşgul, aramayı açmadı")};const o={t:ty,on:false,start:0};calls[f.pin]=o;if(st.set.sound)ringPlay(ty=="video"?st.set.ringG:st.set.ringV,2);renderMsgs();setTimeout(()=>{if(calls[f.pin]!==o)return;ringStop();o.on=true;o.start=Date.now();o.iv=setInterval(updCbar,1000);renderMsgs()},1800)}
 const avH=f=>f.photo?`<img src="${f.photo}">`:f.e;
@@ -32,7 +32,7 @@ let replyTo=null,typing={};
 const lastOf=f=>{for(let i=f.h.length-1;i>=0;i--)if(!f.h[i].del)return f.h[i];return null};
 const tk=m=>m.me&&m.k!="n"?`<span class="tk ${m.st==2&&st.set.read?"rd":""}"><svg viewBox="0 0 18 10" width="${m.st>=1?18:12}" height="10"><path d="M1 5.5l3 3L10 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>${m.st>=1?'<path d="M7 5.5l3 3L16 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>':""}</svg></span>`:"";
 const colp={on:0,off:0};
-function row(f,i){const l=lastOf(f);const cc=calls[f.pin];const sub=cc&&cc.on?(cc.t=="video"?'<svg class="si" viewBox="0 0 24 24"><rect x="2" y="6" width="13" height="12" rx="2.5" fill="currentColor"/><path d="M16 10l6-3v10l-6-3z" fill="currentColor"/></svg>Görüntülü görüşmede':'<svg class="si" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" fill="currentColor"/></svg>Sesli görüşmede'):typing[f.pin]?'<span style="color:var(--cy)">yazıyor…</span>':l?(l.k=="c"?l.txt:l.k=="n"?"😵‍💫 Titreşim":(l.me?tk(l)+" ":"")+(l.aud?"🎤 Sesli mesaj":l.med?medLabel(l):l.img?"📷 Fotoğraf":esc(l.t||""))):(f.np?"🎵 "+esc(f.np):"");return `<div class="c ${i==sel?"sel":""}" onclick="pick(${i})"><div class="av ${stc(f)}" onclick="event.stopPropagation();openPF(${i})">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${sub||"..."}</small></div><div class="cr"><span class="tm">${l&&l.at||""}</span>${f.u?`<span class="bdg">${f.u}</span>`:""}</div><svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`}
+function row(f,i){const l=lastOf(f);const cc=calls[f.pin];const sub=cc&&cc.on?(cc.t=="video"?'<svg class="si" viewBox="0 0 24 24"><rect x="2" y="6" width="13" height="12" rx="2.5" fill="currentColor"/><path d="M16 10l6-3v10l-6-3z" fill="currentColor"/></svg>Görüntülü görüşmede':'<svg class="si" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" fill="currentColor"/></svg>Sesli görüşmede'):typing[f.pin]?'<span style="color:var(--cy)">yazıyor…</span>':l?(l.k=="c"?l.txt:l.k=="n"?"😵‍💫 Titreşim":(l.me?tk(l)+" ":"")+(l.aud?"🎤 Sesli mesaj":l.med?medLabel(l):l.img?"📷 Fotoğraf":l.file?"📄 "+esc(l.file.name):l.loc?"📍 Konum":esc(l.t||""))):(f.np?"🎵 "+esc(f.np):"");return `<div class="c ${i==sel?"sel":""}" onclick="pick(${i})"><div class="av ${stc(f)}" onclick="event.stopPropagation();openPF(${i})">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${sub||"..."}</small></div><div class="cr"><span class="tm">${l&&l.at||""}</span>${f.u?`<span class="bdg">${f.u}</span>`:""}</div><svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`}
 function tgl(g){colp[g]=!colp[g];renderList()}
 function renderList(){const q=($("q").value||"").toLowerCase();const items=st.friends.map((f,i)=>({f,i})).filter(o=>o.f.n.toLowerCase().includes(q)||o.f.pin.toLowerCase().includes(q));const G=[["on","ONLINE","#00e676",items.filter(o=>o.f.s!="off")],["off","OFFLINE","#8b90b5",items.filter(o=>o.f.s=="off")]];$("list").innerHTML=G.filter(g=>g[3].length).map(g=>{const u=g[3].reduce((n,o)=>n+(o.f.u||0),0);return `<div class="gh" onclick="tgl('${g[0]}')"><span class="gd" style="color:${g[2]};background:${g[2]}"></span> ${g[1]} (${g[3].length})${colp[g[0]]&&u?`<span class="bdg">${u}</span>`:""}<span class="ga">${colp[g[0]]?"▸":"▾"}</span></div>`+(colp[g[0]]?"":g[3].map(o=>row(o.f,o.i)).join(""))}).join("")||'<div style="padding:14px;opacity:.6;font-size:13px">Kişi bulunamadı</div>'}
 function renderMsgs(){const f=st.friends[sel];
@@ -55,10 +55,10 @@ const fm=id=>st.friends[sel].h.find(x=>x.id==id);
 function reactMsg(id,em){const m=fm(id);if(!m||m.del)return;m.rx=m.rx===em?"":em;RetroTransport.sendReaction(st.friends[sel],id,m.rx);save();renderMsgs()}
 function menu(e,id){e.stopPropagation();const m=fm(id);if(!m||m.del)return;const mn=$("menu");const rbar='<div class="rbar">'+["❤️","😂","😮","😢","🙏","👍"].map(x=>`<span onclick="reactMsg('${id}','${x}')">${x}</span>`).join("")+'</div>';mn.innerHTML=rbar+`<button onclick="setRep('${id}')">↩ Yanıtla</button><button onclick="cp('${id}')">⧉ Kopyala</button>`+(m.me?`<button onclick="dl('${id}')">🗑 Sil</button>`:"");mn.style.left=Math.min(e.clientX,innerWidth-210)+"px";mn.style.top=Math.min(e.clientY,innerHeight-175)+"px";mn.classList.add("show")}
 document.addEventListener("click",()=>$("menu").classList.remove("show"));
-function setRep(id){const m=fm(id);replyTo=m.med?medLabel(m):m.img&&!m.t?"📷 Fotoğraf":m.t;$("rep").innerHTML=`<span>↩ ${esc(replyTo)}</span><span style="cursor:pointer" onclick="clearRep()">✕</span>`;$("rep").classList.add("show");$("in").focus()}
+function setRep(id){const m=fm(id);replyTo=m.aud?"🎤 Sesli mesaj ("+(m.aud.dur||"0:01")+")":m.med?medLabel(m):m.file?"📄 "+m.file.name:m.loc?"📍 Konum":m.img&&!m.t?"📷 Fotoğraf":m.t;$("rep").innerHTML=`<span>↩ ${esc(replyTo)}</span><span style="cursor:pointer" onclick="clearRep()">✕</span>`;$("rep").classList.add("show");$("in").focus()}
 function clearRep(){replyTo=null;$("rep").classList.remove("show")}
 function cp(id){try{navigator.clipboard.writeText(fm(id).t||"")}catch(e){}}
-function dl(id){const m=fm(id);m.del=true;m.img=null;m.med=null;delete vmem[id];RetroTransport.deleteForAll(st.friends[sel],id);save();renderMsgs()}
+function dl(id){const m=fm(id);const mid=(m.med&&m.med.mediaId)||(m.aud&&m.aud.mediaId)||(m.file&&m.file.mediaId)||"";m.del=true;m.img=null;m.med=null;m.aud=null;m.file=null;delete vmem[id];RetroTransport.deleteForAll(st.friends[sel],id,mid);save();renderMsgs()}
 const replies=["Selam! 😊","Nasılsın?","Haha doğru 😂","Müzik harika bu arada 🎵","Sonra konuşuruz","Tamamdır 👍"];
 function deliver(f,m,nudge){if(f.s=="off")return;setTimeout(()=>{m.st=1;save();renderMsgs()},500);setTimeout(()=>{typing[f.pin]=1;renderMsgs()},1100);setTimeout(()=>{typing[f.pin]=0;m.st=2;if(nudge){f.h.push({k:"n",me:0,id:uid()});shake()}else f.h.push(Math.random()<.3?{id:uid(),me:0,t:"",at:t(),med:{k:"img",mode:Math.random()<.5?"once":"timed",sec:5,src:genImg()}}:{id:uid(),me:0,t:replies[Math.random()*replies.length|0],at:t()});const viewing=st.friends[sel]===f&&($("app").classList.contains("open"));if(!viewing){f.u=(f.u||0)+1;notify(f,f.h[f.h.length-1])}save();renderMsgs()},2800);if(m.med&&m.med.mode!="normal")setTimeout(()=>{if(m.med&&!m.med.gone){m.med.gone=true;m.med.src=null;delete vmem[m.id];save();renderMsgs()}},7000)}
 function send(img){const v=$("in").value.trim();if(!v&&!img)return;const f=st.friends[sel];const m={id:uid(),me:1,t:v,at:t(),st:0,img:img||null,r:replyTo};f.h.push(m);$("in").value="";grow();clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)}
@@ -91,9 +91,9 @@ function fromImg(fl,cb){const r=new FileReader();r.onload=()=>{const im=new Imag
 function genImg(){const c=document.createElement("canvas");c.width=480;c.height=320;const x=c.getContext("2d"),g=x.createLinearGradient(0,0,480,320),h=Math.random()*360|0;g.addColorStop(0,`hsl(${h},80%,55%)`);g.addColorStop(1,`hsl(${(h+80)%360},80%,40%)`);x.fillStyle=g;x.fillRect(0,0,480,320);x.font="130px serif";x.textAlign="center";x.textBaseline="middle";x.fillText(["🌅","🐱","🍕","🎸","🌊","🎉"][Math.random()*6|0],240,150);x.font="bold 26px sans-serif";x.fillStyle="#fff";x.fillText("RetroChat",240,285);return c.toDataURL("image/jpeg",.7)}
 $("file").onchange=e=>{const fl=e.target.files[0];e.target.value="";if(!fl)return;const v=fl.type.startsWith("video/");if(v&&fl.size>30*1024*1024)return toast("Video en fazla 30 MB olabilir");pend={fl,v};const u=URL.createObjectURL(fl);$("mop").innerHTML=v?`<video src="${u}" controls playsinline style="max-width:100%;max-height:200px;border-radius:10px"></video>`:`<img src="${u}" style="max-width:100%;max-height:200px;border-radius:10px">`;document.querySelector('input[name=mm][value=normal]').checked=true;$("mo").style.display="flex"};
 $("moX").onclick=()=>{$("mo").style.display="none";$("mop").innerHTML="";pend=null};
-$("moOk").onclick=()=>{if(!pend)return;const mode=document.querySelector('input[name=mm]:checked').value,sec=+$("moS").value,{fl,v}=pend;pend=null;$("mo").style.display="none";$("mop").innerHTML="";const f=st.friends[sel];
+$("moOk").onclick=async ()=>{if(!pend)return;const mode=document.querySelector('input[name=mm]:checked').value,sec=+$("moS").value,{fl,v}=pend;pend=null;$("mo").style.display="none";$("mop").innerHTML="";const f=st.friends[sel];
 const go=med=>{const m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,med};if(v)vmem[m.id]=URL.createObjectURL(fl);f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)};
-if(v)go({k:"vid",mode,sec,src:null});else fromImg(fl,d=>{if(mode=="normal")send(d);else go({k:"img",mode,sec,src:d})})};
+if(v){if(RetroTransport.isLive()&&RetroTransport.uploadMedia){toast("Video yükleniyor…");try{const up=await RetroTransport.uploadMedia(fl,fl.name||"video.mp4",fl.type||"video/mp4");go({k:"vid",mode,sec,src:up.url,mediaId:up.id})}catch(err){toast("Video yüklenemedi: "+(err.message||"hata"))}}else{go({k:"vid",mode,sec,src:null})}}else fromImg(fl,d=>{if(mode=="normal")send(d);else go({k:"img",mode,sec,src:d})})};
 
 $("hp").style.cursor="pointer";
 function addFriend(n,p){n=(n||"").trim();p=(p||"").trim().toUpperCase();if(!/^[0-9A-F]{8}$/.test(p))return"PIN 8 haneli olmalı (0-9, A-F).";if(p==st.pin||st.friends.some(f=>f.pin==p))return"Bu PIN zaten ekli.";n=n||"Kişi "+p.slice(-4);st.friends.push({n,s:"on",e:["🧑","👧","👦","🧔","👩‍🎤","🦊"][Math.random()*6|0],pin:p,np:"",h:[],ls:""});save();renderList();return""}
@@ -200,24 +200,24 @@ $("nd").innerHTML="🫨";$("nd").className="gib";
 $("send").innerHTML='<svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="20" r="19" fill="var(--t160,#bcc0f5)"/><path d="M10 21l20-9-7 17-3-7z" fill="var(--t161,#3f56d6)"/></svg>';$("send").className="gib";
 $("mtS").innerHTML='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--t83,#4a55c8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>';$("mtS").title="Sesli görüşme";$("mtS").setAttribute("aria-label","Sesli görüşme");
 const fsz=n=>n<1024?n+" B":n<1048576?(n/1024).toFixed(0)+" KB":(n/1048576).toFixed(1)+" MB";
-function fileHTML(m){const d=m.file,u=vmem[m.id],y=d.type||"",ic=/image/.test(y)?"🖼️":/pdf/.test(y)?"📕":/audio/.test(y)?"🎵":/video/.test(y)?"🎞️":/zip|rar|7z|compressed/.test(y)?"🗜️":"📄";return `<span class="fc"><span class="fi2">${ic}</span><span class="fn"><b>${esc(d.name)}</b><small>${fsz(d.size)}${u?"":" · artık mevcut değil"}</small></span>${u?`<a href="${u}" download="${esc(d.name)}" onclick="event.stopPropagation()">⬇</a>`:""}</span>`}
+function fileHTML(m){const d=m.file,u=vmem[m.id]||d.url,y=d.type||"",ic=/image/.test(y)?"🖼️":/pdf/.test(y)?"📕":/audio/.test(y)?"🎵":/video/.test(y)?"🎞️":/zip|rar|7z|compressed/.test(y)?"🗜️":"📄";return `<span class="fc"><span class="fi2">${ic}</span><span class="fn"><b>${esc(d.name)}</b><small>${fsz(d.size)}${u?"":" · artık mevcut değil"}</small></span>${u?`<a href="${u}" download="${esc(d.name)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">⬇</a>`:""}</span>`}
 function locHTML(m){const d=m.loc;return `<a class="lc" href="https://www.google.com/maps?q=${d.lat},${d.lon}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><svg viewBox="0 0 120 70" width="96" height="56"><rect width="120" height="70" rx="8" fill="rgba(255,255,255,.1)"/><path d="M0 22H120M0 46H120M30 0V70M60 0V70M90 0V70" stroke="rgba(255,255,255,.2)" stroke-width="1"/><path d="M60 12a12 12 0 0 1 12 12c0 10-12 24-12 24S48 34 48 24a12 12 0 0 1 12-12z" fill="#3ddc84" stroke="#fff" stroke-width="1.5"/><circle cx="60" cy="24" r="4.5" fill="#fff"/></svg><span>📍 Konum<small>${d.lat}, ${d.lon}${d.acc?" · ±"+d.acc+" m":""}</small></span></a>`}
 $("at").onclick=e=>{e.stopPropagation();$("ap").classList.toggle("show")};
 document.addEventListener("click",e=>{if(!e.target.closest("#ap"))$("ap").classList.remove("show")});
 $("ap").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;$("ap").classList.remove("show");const a=b.dataset.a;if(a=="gal")$("file").click();else if(a=="doc")$("docF").click();else if(a=="aud"&&window.RetroVoice)RetroVoice.startRec();else sendLoc()};
-$("docF").onchange=e=>{const fl=e.target.files[0];e.target.value="";if(!fl)return;if(fl.size>50*1024*1024)return toast("Dosya en fazla 50 MB olabilir");const f=st.friends[sel],m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,file:{name:fl.name,size:fl.size,type:fl.type}};vmem[m.id]=URL.createObjectURL(fl);f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)};
+$("docF").onchange=async e=>{const fl=e.target.files[0];e.target.value="";if(!fl)return;if(fl.size>30*1024*1024)return toast("Dosya en fazla 30 MB olabilir");const f=st.friends[sel];let fileObj={name:fl.name,size:fl.size,type:fl.type};if(RetroTransport.isLive()&&RetroTransport.uploadMedia){toast("Dosya yükleniyor…");try{const up=await RetroTransport.uploadMedia(fl,fl.name,fl.type||"application/octet-stream");fileObj.url=up.url;fileObj.mediaId=up.id}catch(err){return toast("Dosya yüklenemedi: "+(err.message||"hata"))}}const m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,file:fileObj};vmem[m.id]=URL.createObjectURL(fl);f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)};
 function sendLoc(){if(!navigator.geolocation)return toast("Bu cihazda konum desteği yok");toast("Konum alınıyor…");navigator.geolocation.getCurrentPosition(pos=>{const f=st.friends[sel],m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,loc:{lat:+pos.coords.latitude.toFixed(5),lon:+pos.coords.longitude.toFixed(5),acc:Math.round(pos.coords.accuracy)}};f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)},()=>toast("Konum alınamadı. Konum izni verdiğinden emin ol"),{enableHighAccuracy:true,timeout:10000})}
 let nbT=0,nbF=null;
-function notify(f,m){if(!m)return;RetroHaptics.notify(st.set.vib);const x=m.k=="n"?"😵‍💫 Titreşim gönderdi":m.med?medLabel(m):m.img?"📷 Fotoğraf":m.file?"📄 "+m.file.name:m.loc?"📍 Konum":m.t;nbF=f;$("nba").innerHTML=avH(f);$("nbn").textContent=f.n;$("nbt").textContent=x;const b=$("nb");b.classList.add("show");clearTimeout(nbT);nbT=setTimeout(()=>b.classList.remove("show"),4000)}
+function notify(f,m){if(!m)return;RetroHaptics.notify(st.set.vib);const x=m.k=="n"?"😵‍💫 Titreşim gönderdi":m.aud?"🎤 Sesli mesaj ("+(m.aud.dur||"0:01")+")":m.med?medLabel(m):m.img?"📷 Fotoğraf":m.file?"📄 "+m.file.name:m.loc?"📍 Konum":m.t;nbF=f;$("nba").innerHTML=avH(f);$("nbn").textContent=f.n;$("nbt").textContent=x;const b=$("nb");b.classList.add("show");clearTimeout(nbT);nbT=setTimeout(()=>b.classList.remove("show"),4000)}
 let nbMoved=false;
 $("nb").onclick=()=>{if(nbMoved){nbMoved=false;return}$("nb").classList.remove("show");const i=st.friends.indexOf(nbF);if(i>=0)pick(i)};
 const autoMsgs=["Naber? 😊","Akşam boş musun?","Şu şarkıyı dinledin mi? 🎵","Toplantı kaçtaydı?","Günaydın! ☀️","Bir şey soracaktım","😂😂😂","Dosyayı gönderdim mi?","Müsait olunca ara 👋"];
 let autoT=0;
 function fireAuto(){const open=$("app").classList.contains("open");const c=st.friends.filter(f=>f.s!="off"&&!(open&&st.friends[sel]===f));if(!c.length)return false;const f=c[Math.random()*c.length|0],m={id:uid(),me:0,t:autoMsgs[Math.random()*autoMsgs.length|0],at:t()};f.h.push(m);f.u=(f.u||0)+1;save();renderMsgs();notify(f,m);return true}
-function autoLoop(first){clearTimeout(autoT);if(st.set.auto===false)return;autoT=setTimeout(()=>{fireAuto();autoLoop()},first||rnd(9000,16000))}
+function autoLoop(first){clearTimeout(autoT);if(st.set.auto!==true)return;autoT=setTimeout(()=>{fireAuto();autoLoop()},first||rnd(9000,16000))}
 $("sAuto").onchange=()=>{readSet();autoLoop(6000)};
 $("sFire").onclick=()=>{if(!fireAuto())toast("Mesaj gönderebilecek başka online kişi yok")};
-autoLoop(7000);
+if(st.set.auto===true&&!RetroTransport.isLive())autoLoop(7000);
 (function(){const b=$("nb");let y0=null,dy=0;
 b.addEventListener("pointerdown",e=>{y0=e.clientY;dy=0;nbMoved=false;b.style.transition="none";clearTimeout(nbT);try{b.setPointerCapture(e.pointerId)}catch(_){}});
 b.addEventListener("pointermove",e=>{if(y0==null)return;const d=e.clientY-y0;dy=Math.min(0,d);if(Math.abs(d)>6)nbMoved=true;b.style.transform=`translate(-50%,${dy}px)`;b.style.opacity=Math.max(.25,1+dy/140)});
@@ -256,6 +256,14 @@ let liveT=null;const live=()=>{clearTimeout(liveT);liveT=setTimeout(()=>{readSet
 $("set").addEventListener("input",live);$("set").addEventListener("change",live);
 window.androidBack=function(){
  const sh=$("shs");if(sh){sh.remove();return true}
+ if($("mv")&&$("mv").style.display=="flex"){closeMed();return true}
+ if($("mo")&&$("mo").style.display=="flex"){$("moX").click();return true}
+ if($("gm")&&$("gm").style.display=="flex"){$("gX").click();return true}
+ if($("gp")&&$("gp").style.display=="flex"){$("gpX").click();return true}
+ if($("bp")&&$("bp").style.display=="flex"){$("bpX").click();return true}
+ if($("ep")&&$("ep").style.display=="flex"){$("pX").click();return true}
+ if($("menu")&&$("menu").classList.contains("show")){$("menu").classList.remove("show");return true}
+ if($("kmenu")&&$("kmenu").classList.contains("show")){$("kmenu").classList.remove("show");return true}
  if($("cam")&&$("cam").style.display=="flex"){$("cX").click();return true}
  if($("pf").style.display=="flex"){$("pf").style.display="none";return true}
  if($("qrm")&&$("qrm").style.display=="flex"){QR.closeQR();return true}
@@ -297,14 +305,14 @@ $("pfSpOff").onclick=()=>{const c=st.set;c.mus=false;c.song="";delete c.sp;clear
 spHandle(location.href).then(spStart);
 drawNp();
 function applySet(){const c=st.set;document.documentElement.style.setProperty("--cy",c.col);$("myname").textContent=c.name;$("mydot").className="dot "+c.status;$("myav").className="av "+c.status;$("mypin").textContent=st.pin;$("myph").innerHTML=myAv();document.documentElement.style.setProperty("--fs",(c.fs||100)/100);document.body.classList.toggle("nt",!!c.night);applyBg();applyFC()}
-function fill(){const c=st.set;$("sName").value=c.name;$("sStatus").value=c.status;$("sPin").textContent=st.pin;$("sSound").checked=c.sound;$("sNight").checked=!!c.night;$("sVol").value=c.vol;$("sShake").checked=c.shake;$("sInt").value=c.int;$("sVib").checked=c.vib;$("sRead").checked=c.read;$("sAuto").checked=c.auto!==false;$("sCol").value=c.col;$("sFs").value=c.fs||100;$("sFsV").textContent=(c.fs||100)+"%";fsSim();$("sPh").innerHTML=myAv();$("sVibNote").textContent=RetroHaptics.describeSupport()}
+function fill(){const c=st.set;$("sName").value=c.name;$("sStatus").value=c.status;$("sPin").textContent=st.pin;$("sSound").checked=c.sound;$("sNight").checked=!!c.night;$("sVol").value=c.vol;$("sShake").checked=c.shake;$("sInt").value=c.int;$("sVib").checked=c.vib;$("sRead").checked=c.read;$("sAuto").checked=c.auto===true;$("sCol").value=c.col;$("sFs").value=c.fs||100;$("sFsV").textContent=(c.fs||100)+"%";fsSim();$("sPh").innerHTML=myAv();$("sVibNote").textContent=RetroHaptics.describeSupport()}
 function readSet(){const c=st.set;c.name=$("sName").value.trim()||"Ahmet";c.status=$("sStatus").value;c.sound=$("sSound").checked;c.vol=+$("sVol").value;c.shake=$("sShake").checked;c.int=+$("sInt").value;c.vib=$("sVib").checked;c.read=$("sRead").checked;c.timed=$("sTimed").checked;c.auto=$("sAuto").checked;c.col=$("sCol").value;c.fs=+$("sFs").value;applySet();save();renderMsgs()}
 $("gear").onclick=()=>{fill();$("set").classList.add("show");sPage(null)};
 $("sClose").onclick=()=>{readSet();$("set").classList.remove("show")};
 $("set").onclick=e=>{if(e.target.id=="set")$("sClose").onclick()};
 
 $("sTest").onclick=()=>{readSet();shake()};
-$("sClear").onclick=function(){if(this.dataset.a){st.friends.forEach(f=>f.h=[]);save();renderMsgs();this.textContent="Sohbetleri sil";delete this.dataset.a}else{this.dataset.a=1;this.textContent="Emin misin? Tekrar bas"}};
+$("sClear").onclick=function(){if(this.dataset.a){st.friends.forEach(f=>{f.h=[];f.u=0});save();renderMsgs();this.textContent="Sohbetleri sil";delete this.dataset.a}else{this.dataset.a=1;this.textContent="Emin misin? Tekrar bas"}};
 
 
 /* ----- Tema rengi: mor tonların hepsi seçilen renge bağlanır ----- */
@@ -456,7 +464,7 @@ closeMed = function () {
   const m = cur;
   _origCloseMed();
   if (m && !m.me && m.med && m.med.mode !== "normal" && RetroTransport.isLive()) {
-    RetroTransport.sendMediaOpened(st.friends[sel], m.id);
+    RetroTransport.sendMediaOpened(st.friends[sel], m.id, m.med.mediaId || "");
   }
 };
 
@@ -601,6 +609,8 @@ RetroTransport.init({
       m.del = true;
       m.img = null;
       m.med = null;
+      m.aud = null;
+      m.file = null;
       delete vmem[msgId];
       save();
       renderMsgs();

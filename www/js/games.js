@@ -9,6 +9,7 @@
   let ctx = null;
   let G = null; // { k, f, host, sc:[me,opp,draw], r, b, turn, over, win, myPick, oppPick, res }
   let pendingInvite = null; // { fromPin, friend, k }
+  let inviteTimer = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -234,12 +235,19 @@
 
   function invite(friend, k) {
     $("gp").style.display = "none";
+    clearTimeout(inviteTimer);
     friend.h.push({ k: "c", id: ctx.uid(), txt: "🎮 " + GN[k] + " oyununa davet ettin", ts: Date.now() });
     ctx.save();
     ctx.renderMsgs();
     ctx.toast(friend.n + " daveti bekliyor…");
     G = { k, f: friend, host: true, sc: [0, 0, 0], r: 0, waiting: true };
     global.RetroTransport.sendRaw({ type: "game_invite", to: friend.pin, game: k });
+    inviteTimer = setTimeout(() => {
+      if (G && G.waiting && G.f.pin === friend.pin) {
+        G = null;
+        ctx.toast(friend.n + " oyun davetine yanıt vermedi");
+      }
+    }, 30000);
   }
 
   function showInviteBanner(inv) {
@@ -285,6 +293,8 @@
   }
 
   function end(sendSignal) {
+    clearTimeout(inviteTimer);
+    inviteTimer = null;
     if (!G) return false;
     const g = G;
     G = null;
@@ -316,6 +326,8 @@
       }
       case "game_accept": {
         if (!G || !G.waiting || G.f.pin !== fromPin) return;
+        clearTimeout(inviteTimer);
+        inviteTimer = null;
         G.waiting = false;
         G.f.h.push({ k: "c", id: ctx.uid(), txt: "🎮 " + G.f.n + " daveti kabul etti", ts: Date.now() });
         ctx.save();
@@ -326,6 +338,8 @@
       }
       case "game_decline": {
         if (G && G.waiting && G.f.pin === fromPin) {
+          clearTimeout(inviteTimer);
+          inviteTimer = null;
           ctx.toast(G.f.n + " oyun davetini reddetti");
           G = null;
         }

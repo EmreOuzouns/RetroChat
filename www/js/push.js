@@ -31,8 +31,11 @@
     if (!isSupported()) {
       if (bar) bar.style.display = "none";
       if (btn) btn.style.display = "none";
+      const isCapNative = !!(global.Capacitor && global.Capacitor.isNativePlatform && global.Capacitor.isNativePlatform());
       if (note) {
-        note.textContent = "iPhone'da arka plan bildirimleri için uygulamayı Safari → Paylaş → Ana Ekrana Ekle ile açman gerekir.";
+        note.textContent = isCapNative
+          ? "Yerel uygulama bildirimleri cihaz ayarları üzerinden yönetilir."
+          : "iPhone'da arka plan bildirimleri için uygulamayı Safari → Paylaş → Ana Ekrana Ekle ile açman gerekir.";
       }
       return;
     }

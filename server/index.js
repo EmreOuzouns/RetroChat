@@ -1,23 +1,29 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 let webpush = null;
 try { webpush = require("web-push"); } catch (e) {}
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const MEDIA_DIR = path.join(DATA_DIR, "media");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 const WWW_DIR = path.resolve(__dirname, "..", "www");
-const MAX_PAYLOAD = 35 * 1024 * 1024; // 35 MB (video/dosya için)
+const MAX_PAYLOAD = 35 * 1024 * 1024; // 35 MB (WS mesaj/medya için)
+const MAX_UPLOAD = 30 * 1024 * 1024; // 30 MB (HTTP medya/dosya/ses yükleme)
+const MEDIA_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 gün
 
-fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
-// Kalıcı depo: kullanıcı PIN + token + profil + çevrimdışı kuyruk + push abonelikleri + VAPID
+// Kalıcı depo: kullanıcı PIN + token + profil + çevrimdışı kuyruk + push + native token + medya indeksi
 let store = {
   users: {}, // pin -> { token, profile, lastSeen }
   queue: {}, // toPin -> [ { ...event, queuedAt } ]
   pushSubs: {}, // pin -> [ subscription, ... ]
+  nativeTokens: {}, // pin -> { token, platform, updatedAt }
+  media: {}, // id -> { name, mime, size, owner, createdAt }
   vapid: null, // { publicKey, privateKey }
 };
 
@@ -28,6 +34,8 @@ try {
       store.users = raw.users || {};
       store.queue = raw.queue || {};
       store.pushSubs = raw.pushSubs || {};
+      store.nativeTokens = raw.nativeTokens || {};
+      store.media = raw.media || {};
       store.vapid = raw.vapid || null;
     }
   }
@@ -61,7 +69,7 @@ function sendPushToPin(pin, payload) {
   const subs = store.pushSubs[pin];
   if (!subs || !subs.length) return;
   const body = JSON.stringify(payload);
-  subs.forEach((sub, idx) => {
+  subs.forEach((sub) => {
     webpush.sendNotification(sub, body, { TTL: payload.kind === "call" ? 45 : 86400, urgency: "high" }).catch((err) => {
       if (err && (err.statusCode === 404 || err.statusCode === 410)) {
         store.pushSubs[pin] = (store.pushSubs[pin] || []).filter((s) => s.endpoint !== sub.endpoint);
@@ -76,22 +84,54 @@ function senderName(pin) {
   return (u && u.profile && u.profile.name) || ("Kişi " + pin.slice(-4));
 }
 
+// Asenkron atomik kayıt (event loop bloklanmaz, çökmede store.json bozulmaz)
 let saveTimer = null;
+let saving = false;
+let saveQueued = false;
+
+async function flushSave() {
+  if (saving) {
+    saveQueued = true;
+    return;
+  }
+  saving = true;
+  try {
+    const tmp = STORE_PATH + ".tmp";
+    await fs.promises.writeFile(tmp, JSON.stringify(store), "utf8");
+    await fs.promises.rename(tmp, STORE_PATH);
+  } catch (e) {
+    console.error("Store save error:", e.message);
+  } finally {
+    saving = false;
+    if (saveQueued) {
+      saveQueued = false;
+      scheduleSave();
+    }
+  }
+}
+
 function scheduleSave() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    try {
-      fs.writeFileSync(STORE_PATH, JSON.stringify(store), "utf8");
-    } catch (e) {
-      console.error("Store save error:", e.message);
-    }
+    flushSave();
   }, 500);
 }
 
-// 24 saatten eski kuyruğa alınmış süreli mesajları temizle
+function deleteMediaById(mediaId) {
+  if (!mediaId || !/^[0-9a-f]{24}$/.test(mediaId)) return;
+  if (store.media[mediaId]) {
+    delete store.media[mediaId];
+    scheduleSave();
+  }
+  const fp = path.join(MEDIA_DIR, mediaId);
+  fs.promises.unlink(fp).catch(() => {});
+}
+
+// 24 saatten eski süreli mesaj kuyruğunu ve 7 günden eski medya dosyalarını temizle
 setInterval(() => {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const cutoff = now - 24 * 60 * 60 * 1000;
   let changed = false;
   for (const pin of Object.keys(store.queue)) {
     const before = store.queue[pin].length;
@@ -100,6 +140,17 @@ setInterval(() => {
     );
     if (store.queue[pin].length !== before) changed = true;
     if (!store.queue[pin].length) delete store.queue[pin];
+  }
+  const mediaCutoff = now - MEDIA_TTL_MS;
+  for (const id of Object.keys(store.media)) {
+    if ((store.media[id].createdAt || 0) < mediaCutoff) {
+      delete store.media[id];
+      fs.promises.unlink(path.join(MEDIA_DIR, id)).catch(() => {});
+      changed = true;
+    }
+  }
+  for (const [pin, pc] of pendingCalls.entries()) {
+    if (pc.expiresAt <= now) pendingCalls.delete(pin);
   }
   if (changed) scheduleSave();
 }, 60 * 1000);
@@ -132,6 +183,14 @@ function sendToPin(pin, payload, queueIfOffline = false) {
   return delivered;
 }
 
+function rememberPeerRelation(pinA, pinB) {
+  if (!pinA || !pinB || pinA === pinB) return;
+  const setA = clients.get(pinA);
+  if (setA) for (const w of setA) if (w.friends) w.friends.add(pinB);
+  const setB = clients.get(pinB);
+  if (setB) for (const w of setB) if (w.friends) w.friends.add(pinA);
+}
+
 function publicProfile(pin) {
   const u = store.users[pin];
   const isOnline = clients.has(pin) && clients.get(pin).size > 0;
@@ -150,15 +209,33 @@ function publicProfile(pin) {
   };
 }
 
+// Yalnızca ilgili PIN'i kişi listesinde barındıran istemcilere presence yayınla (gizlilik & performans)
 function broadcastPresence(pin) {
   const prof = publicProfile(pin);
   if (!prof) return;
   const payload = { type: "presence", user: prof };
-  // Tüm bağlı istemcilere bildir (küçük arkadaş grubu için hızlı ve basit)
   for (const [otherPin, set] of clients.entries()) {
     if (otherPin === pin) continue;
-    for (const ws of set) sendJSON(ws, payload);
+    for (const ws of set) {
+      if (ws.friends && ws.friends.has(pin)) {
+        sendJSON(ws, payload);
+      }
+    }
   }
+}
+
+function authHttpPin(req) {
+  const pin = String(req.headers["x-pin"] || "").trim().toUpperCase();
+  const token = String(req.headers["x-token"] || "").trim();
+  if (!/^[0-9A-F]{8}$/.test(pin) || token.length < 16) return null;
+  const u = store.users[pin];
+  if (u && u.token !== token) return null;
+  return pin;
+}
+
+function sanitizeFileName(raw) {
+  const base = String(raw || "dosya").replace(/[\r\n"\\/]+/g, "_").slice(0, 120);
+  return base || "dosya";
 }
 
 // MIME tipleri (www statik servisi için)
@@ -176,7 +253,8 @@ const MIME = {
 
 const server = http.createServer((req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Pin, X-Token, X-File-Name, X-File-Type");
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     return res.end();
@@ -192,6 +270,7 @@ const server = http.createServer((req, res) => {
         service: "retrochat-server",
         onlineUsers: clients.size,
         registeredPins: Object.keys(store.users).length,
+        mediaCount: Object.keys(store.media).length,
         pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
         turnReady: true,
         uptimeSec: Math.floor(process.uptime()),
@@ -213,18 +292,16 @@ const server = http.createServer((req, res) => {
       });
     } else {
       // Varsayılan ücretsiz OpenRelay TURN yedekleri (4G/5G katı NAT için)
-      iceServers.push(
-        {
-          urls: [
-            "turn:openrelay.metered.ca:80",
-            "turn:openrelay.metered.ca:443",
-            "turn:openrelay.metered.ca:443?transport=tcp",
-            "turns:openrelay.metered.ca:443?transport=tcp",
-          ],
-          username: "openrelayproject",
-          credential: "openrelayproject",
-        }
-      );
+      iceServers.push({
+        urls: [
+          "turn:openrelay.metered.ca:80",
+          "turn:openrelay.metered.ca:443",
+          "turn:openrelay.metered.ca:443?transport=tcp",
+          "turns:openrelay.metered.ca:443?transport=tcp",
+        ],
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      });
     }
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     return res.end(JSON.stringify({ iceServers }));
@@ -235,6 +312,137 @@ const server = http.createServer((req, res) => {
     return res.end(
       JSON.stringify({ publicKey: store.vapid ? store.vapid.publicKey : null })
     );
+  }
+
+  // Medya / Sesli Mesaj / Video / Dosya Yükleme (HTTP streaming — WS & localStorage şişmesini önler)
+  if (urlPath === "/media/upload" && req.method === "POST") {
+    const owner = authHttpPin(req);
+    if (!owner) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Yetkisiz yükleme" }));
+    }
+
+    const contentLen = parseInt(req.headers["content-length"] || "0", 10);
+    if (contentLen > MAX_UPLOAD) {
+      res.writeHead(413, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Dosya en fazla 30 MB olabilir" }));
+    }
+
+    const id = crypto.randomBytes(12).toString("hex");
+    const targetPath = path.join(MEDIA_DIR, id);
+    const mime = String(req.headers["x-file-type"] || req.headers["content-type"] || "application/octet-stream")
+      .split("\r")[0].split("\n")[0].slice(0, 120);
+    let rawName = "dosya";
+    try {
+      rawName = decodeURIComponent(String(req.headers["x-file-name"] || "dosya"));
+    } catch (e) {
+      rawName = String(req.headers["x-file-name"] || "dosya");
+    }
+    const name = sanitizeFileName(rawName);
+
+    const out = fs.createWriteStream(targetPath);
+    let size = 0;
+    let aborted = false;
+
+    req.on("data", (chunk) => {
+      if (aborted) return;
+      size += chunk.length;
+      if (size > MAX_UPLOAD) {
+        aborted = true;
+        out.destroy();
+        fs.promises.unlink(targetPath).catch(() => {});
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Dosya en fazla 30 MB olabilir" }));
+        req.destroy();
+        return;
+      }
+      if (!out.write(chunk)) {
+        req.pause();
+        out.once("drain", () => req.resume());
+      }
+    });
+
+    req.on("end", () => {
+      if (aborted) return;
+      out.end(() => {
+        if (size === 0) {
+          fs.promises.unlink(targetPath).catch(() => {});
+          res.writeHead(400, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "Boş dosya" }));
+        }
+        store.media[id] = { name, mime, size, owner, createdAt: Date.now() };
+        scheduleSave();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, id, url: "/media/" + id, size }));
+      });
+    });
+
+    req.on("error", () => {
+      aborted = true;
+      out.destroy();
+      fs.promises.unlink(targetPath).catch(() => {});
+    });
+    return;
+  }
+
+  // Medya indirme / akış (Range destekli — iOS Safari & Android Chrome video/ses uyumlu)
+  if (urlPath.startsWith("/media/")) {
+    const id = urlPath.slice("/media/".length);
+    if (!/^[0-9a-f]{24}$/.test(id)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Medya bulunamadı" }));
+    }
+
+    if (req.method === "DELETE") {
+      const owner = authHttpPin(req);
+      if (!owner) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: "Yetkisiz" }));
+      }
+      deleteMediaById(id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+
+    const filePath = path.join(MEDIA_DIR, id);
+    if (!fs.existsSync(filePath)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Medya artık mevcut değil" }));
+    }
+
+    const stat = fs.statSync(filePath);
+    const meta = store.media[id] || { name: "dosya", mime: "application/octet-stream" };
+    const isInline = /^(image|video|audio)\//.test(meta.mime);
+    const disp = (isInline ? "inline" : "attachment") + `; filename="${sanitizeFileName(meta.name)}"`;
+    const range = req.headers.range;
+
+    if (range) {
+      const m = /^bytes=(\d*)-(\d*)$/.exec(range);
+      if (m) {
+        const start = m[1] ? parseInt(m[1], 10) : 0;
+        const end = m[2] ? Math.min(parseInt(m[2], 10), stat.size - 1) : stat.size - 1;
+        if (start <= end && start < stat.size) {
+          res.writeHead(206, {
+            "Content-Type": meta.mime,
+            "Content-Length": end - start + 1,
+            "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+            "Accept-Ranges": "bytes",
+            "Content-Disposition": disp,
+            "Cache-Control": "private, max-age=604800",
+          });
+          return fs.createReadStream(filePath, { start, end }).pipe(res);
+        }
+      }
+    }
+
+    res.writeHead(200, {
+      "Content-Type": meta.mime,
+      "Content-Length": stat.size,
+      "Accept-Ranges": "bytes",
+      "Content-Disposition": disp,
+      "Cache-Control": "private, max-age=604800",
+    });
+    return fs.createReadStream(filePath).pipe(res);
   }
 
   // Statik www/ dosyalarını sun (hem tarayıcıdan test hem PWA için)
@@ -256,6 +464,7 @@ const wss = new WebSocketServer({ server, maxPayload: MAX_PAYLOAD });
 
 wss.on("connection", (ws) => {
   ws.pin = null;
+  ws.friends = new Set();
   ws.isAlive = true;
 
   ws.on("pong", () => {
@@ -301,14 +510,16 @@ wss.on("connection", (ws) => {
       }
 
       ws.pin = pin;
+      const friendPins = Array.isArray(data.friends)
+        ? data.friends.map((fp) => String(fp || "").trim().toUpperCase()).filter((fp) => /^[0-9A-F]{8}$/.test(fp))
+        : [];
+      ws.friends = new Set(friendPins);
+
       if (!clients.has(pin)) clients.set(pin, new Set());
       clients.get(pin).add(ws);
 
       // Arkadaş listesinin güncel durumlarını döndür
-      const friendPins = Array.isArray(data.friends) ? data.friends : [];
-      const presences = friendPins
-        .map((fp) => publicProfile(String(fp || "").toUpperCase()))
-        .filter(Boolean);
+      const presences = friendPins.map((fp) => publicProfile(fp)).filter(Boolean);
 
       sendJSON(ws, { type: "auth_ok", pin, presences });
       broadcastPresence(pin);
@@ -319,6 +530,7 @@ wss.on("connection", (ws) => {
         delete store.queue[pin];
         scheduleSave();
         for (const ev of pending) {
+          if (ev.from) ws.friends.add(ev.from);
           sendJSON(ws, ev);
           // Gönderene iletildi (st: 1) bildirimi
           if (ev.type === "msg" && ev.from && ev.msg && ev.msg.id) {
@@ -331,6 +543,7 @@ wss.on("connection", (ws) => {
       const pc = pendingCalls.get(pin);
       if (pc && pc.expiresAt > Date.now()) {
         pendingCalls.delete(pin);
+        if (pc.offer && pc.offer.from) ws.friends.add(pc.offer.from);
         sendJSON(ws, pc.offer);
         for (const ice of pc.ice) sendJSON(ws, ice);
       }
@@ -360,6 +573,9 @@ wss.on("connection", (ws) => {
 
       case "lookup_pin": {
         const target = String(data.pin || "").trim().toUpperCase();
+        if (/^[0-9A-F]{8}$/.test(target)) {
+          ws.friends.add(target);
+        }
         const prof = publicProfile(target);
         sendJSON(ws, { type: "lookup_result", pin: target, user: prof });
         break;
@@ -387,6 +603,7 @@ wss.on("connection", (ws) => {
 
       case "msg": {
         if (!to || !data.msg) break;
+        rememberPeerRelation(from, to);
         const delivered = sendToPin(
           to,
           { type: "msg", from, msg: data.msg, timed: !!data.timed },
@@ -410,6 +627,7 @@ wss.on("connection", (ws) => {
 
       case "nudge": {
         if (!to) break;
+        rememberPeerRelation(from, to);
         sendToPin(to, { type: "nudge", from, at: Date.now() }, true);
         sendPushToPin(to, {
           kind: "nudge",
@@ -434,12 +652,14 @@ wss.on("connection", (ws) => {
 
       case "delete_for_all": {
         if (!to || !data.msgId) break;
+        if (data.mediaId) deleteMediaById(data.mediaId);
         sendToPin(to, { type: "delete_for_all", from, msgId: data.msgId }, true);
         break;
       }
 
       case "media_opened": {
         if (!to || !data.msgId) break;
+        if (data.mediaId) deleteMediaById(data.mediaId);
         sendToPin(to, { type: "media_opened", from, msgId: data.msgId }, true);
         break;
       }
@@ -474,7 +694,17 @@ wss.on("connection", (ws) => {
       case "game_move":
       case "game_end": {
         if (!to) break;
+        rememberPeerRelation(from, to);
         sendToPin(to, { ...data, from }, false);
+        if (data.type === "game_invite") {
+          const gNames = { xox: "XOX", rps: "Taş Kağıt Makas", c4: "Dört Bağla" };
+          sendPushToPin(to, {
+            kind: "msg",
+            from,
+            title: senderName(from),
+            body: `🎮 Seni ${gNames[data.game] || "mini oyun"} oyununa davet etti!`,
+          });
+        }
         break;
       }
 
@@ -488,6 +718,7 @@ wss.on("connection", (ws) => {
       case "call_reject":
       case "call_busy": {
         if (!to) break;
+        rememberPeerRelation(from, to);
         const evPayload = { ...data, from };
         const ok = sendToPin(to, evPayload, false);
         if (data.type === "call_offer") {
@@ -511,6 +742,8 @@ wss.on("connection", (ws) => {
           pendingCalls.get(to).ice.push(evPayload);
         } else if (data.type === "call_end" && pendingCalls.has(to)) {
           pendingCalls.delete(to);
+        } else if ((data.type === "call_answer" || data.type === "call_reject") && pendingCalls.has(from)) {
+          pendingCalls.delete(from);
         }
         break;
       }

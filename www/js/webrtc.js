@@ -27,6 +27,7 @@
   let pendingOffer = null;
   let pendingIce = [];
   let iceRestarting = false;
+  let ringTimer = null;
   let state = null; // { pin, friend, type, dir, phase, reconnecting, start, timer, muted, camOff, facing, minimized }
 
   function $(id) {
@@ -42,7 +43,9 @@
     if (cachedIce) return cachedIce;
     try {
       const base =
-        /^https?:$/.test(location.protocol)
+        global.RetroTransport && global.RetroTransport.getHttpBase
+          ? global.RetroTransport.getHttpBase()
+          : /^https?:$/.test(location.protocol)
           ? ""
           : "https://retrochat-server-production.up.railway.app";
       const r = await fetch(base + "/rtc/ice-servers", { cache: "no-store" });
@@ -69,7 +72,8 @@
   }
 
   async function tryIceRestart() {
-    if (!pc || !state || iceRestarting || state.dir !== "out") return;
+    if (!pc || !state || iceRestarting || state.phase === "ringing") return;
+    if (pc.signalingState !== "stable") return;
     iceRestarting = true;
     state.reconnecting = true;
     updateUI();
@@ -126,6 +130,20 @@
       }
     };
 
+    peer.oniceconnectionstatechange = () => {
+      if (!state || pc !== peer) return;
+      if (peer.iceConnectionState === "connected" || peer.iceConnectionState === "completed") {
+        state.reconnecting = false;
+        onConnected();
+      } else if (peer.iceConnectionState === "disconnected") {
+        state.reconnecting = true;
+        updateUI();
+        tryIceRestart();
+      } else if (peer.iceConnectionState === "failed") {
+        tryIceRestart();
+      }
+    };
+
     peer.onconnectionstatechange = () => {
       if (!state || pc !== peer) return;
       if (peer.connectionState === "connected") {
@@ -139,14 +157,14 @@
           if (pc === peer && (peer.connectionState === "failed" || peer.connectionState === "disconnected")) {
             cleanup(true, "Bağlantı koptu");
           }
-        }, 10000);
+        }, 12000);
       } else if (peer.connectionState === "failed") {
         tryIceRestart();
         setTimeout(() => {
           if (pc === peer && peer.connectionState === "failed") {
             cleanup(true, "Arama bağlantısı kurulamadı");
           }
-        }, 6000);
+        }, 7000);
       }
     };
 
@@ -155,6 +173,8 @@
 
   function onConnected() {
     if (!state) return;
+    clearTimeout(ringTimer);
+    ringTimer = null;
     if (state.phase !== "active") {
       ctx.ringStop();
       state.phase = "active";
@@ -186,6 +206,8 @@
         ? `${f.n} · Yeniden bağlanıyor…`
         : state.phase === "active"
         ? `${f.n} ile ${isVid ? "görüntülü" : "sesli"} görüşme · ${dur}`
+        : state.phase === "connecting"
+        ? `${f.n} · Bağlanıyor…`
         : state.dir === "in"
         ? `${f.n} arıyor…`
         : `${f.n} aranıyor…`;
@@ -205,6 +227,8 @@
       ? "Ağ değişti, yeniden bağlanıyor…"
       : state.phase === "active"
       ? (isVid ? "Görüntülü görüşme · " : "Sesli görüşme · ") + dur
+      : state.phase === "connecting"
+      ? "Bağlantı kuruluyor…"
       : state.dir === "in"
       ? isVid
         ? "Gelen görüntülü arama…"
@@ -277,6 +301,14 @@
       sdp: offer,
     });
 
+    clearTimeout(ringTimer);
+    ringTimer = setTimeout(() => {
+      if (state && state.pin === friend.pin && state.phase === "ringing") {
+        global.RetroTransport.sendRaw({ type: "call_end", to: friend.pin });
+        cleanup(true, friend.n + " cevap vermedi");
+      }
+    }, 40000);
+
     updateUI();
   }
 
@@ -317,7 +349,11 @@
       sdp: answer,
     });
 
-    onConnected();
+    state.phase = "connecting";
+    updateUI();
+    if (pc.connectionState === "connected" || pc.iceConnectionState === "connected") {
+      onConnected();
+    }
   }
 
   function reject() {
@@ -339,6 +375,8 @@
 
   function cleanup(recordLog, reasonMsg) {
     ctx.ringStop();
+    clearTimeout(ringTimer);
+    ringTimer = null;
     if (state) {
       clearInterval(state.timer);
       const dur = state.phase === "active" && state.start ? Date.now() - state.start : 0;
@@ -465,18 +503,32 @@
 
       case "call_answer": {
         if (!state || !pc || state.pin !== fromPin) return;
+        clearTimeout(ringTimer);
+        ringTimer = null;
+        ctx.ringStop();
         await pc.setRemoteDescription(new RTCSessionDescription(ev.sdp));
         for (const c of pendingIce) {
           try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
         }
         pendingIce = [];
-        onConnected();
+        if (state.phase === "ringing") {
+          state.phase = "connecting";
+          updateUI();
+        }
+        if (pc.connectionState === "connected" || pc.iceConnectionState === "connected") {
+          onConnected();
+        }
         break;
       }
 
       case "call_renegotiate": {
         if (!state || !pc || state.pin !== fromPin) return;
         try {
+          if (pc.signalingState !== "stable") {
+            // Glare çözümü: arayan (out) öncelikli, aranan (in) geri alıp kabul eder
+            if (state.dir === "out") return;
+            await pc.setLocalDescription({ type: "rollback" });
+          }
           await pc.setRemoteDescription(new RTCSessionDescription(ev.sdp));
           const ans = await pc.createAnswer();
           await pc.setLocalDescription(ans);
@@ -558,6 +610,11 @@
     return !!state;
   }
 
+  function getCallInfo() {
+    if (!state) return null;
+    return { pin: state.pin, type: state.type, active: state.phase === "active" };
+  }
+
   global.RetroCalls = {
     init,
     start,
@@ -566,6 +623,8 @@
     hangup,
     minimize,
     maximize,
+    syncBar: updateUI,
+    getCallInfo,
     handleEvent,
     isActive,
   };

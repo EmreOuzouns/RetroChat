@@ -1,11 +1,20 @@
 /* RetroChat Service Worker — PWA + Arka Plan Web Push Bildirimleri (Mesaj, Nudge, Arama) */
-const CACHE = "retrochat-v2";
+const CACHE = "retrochat-v3";
 const ASSETS = [
   "/",
   "/index.html",
   "/indir.html",
   "/manifest.json",
   "/css/style.css",
+  "/js/haptics.js",
+  "/js/transport.js",
+  "/js/qr.js",
+  "/js/webrtc.js",
+  "/js/games.js",
+  "/js/push.js",
+  "/js/voice.js",
+  "/js/native.js",
+  "/js/app.js",
   "/icons/icon.svg",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -31,7 +40,7 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
-  if (url.pathname.startsWith("/push/") || url.pathname.startsWith("/rtc/") || url.pathname === "/health") return;
+  if (url.pathname.startsWith("/push/") || url.pathname.startsWith("/rtc/") || url.pathname.startsWith("/media/") || url.pathname === "/health") return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
