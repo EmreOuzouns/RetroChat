@@ -4,5 +4,7 @@ server/data/
 .tools/
 .DS_Store
 *.log
-android/
-ios/
+android/.gradle/
+android/build/
+android/app/build/
+ios/App/Pods/

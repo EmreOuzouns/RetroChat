@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RetroChat</string>
+    <string name="title_activity_main">RetroChat</string>
+    <string name="package_name">com.retrochat.app</string>
+    <string name="custom_url_scheme">com.retrochat.app</string>
+</resources>
