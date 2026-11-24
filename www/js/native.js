@@ -30,9 +30,19 @@
       });
     }
 
-    // Push bildirim izni (FCM / APNs yapılandırıldığında otomatik kayıt)
+    // Push bildirim izni & FCM/APNs token kaydı (Native Android/iOS VoIP hazır)
     if (Plugins.PushNotifications) {
       try {
+        Plugins.PushNotifications.addListener("registration", (token) => {
+          if (token && token.value && global.RetroTransport) {
+            const plat = Cap.getPlatform ? Cap.getPlatform() : "native";
+            global.RetroTransport.sendRaw({
+              type: "native_push_register",
+              token: token.value,
+              platform: plat,
+            });
+          }
+        });
         Plugins.PushNotifications.checkPermissions().then((res) => {
           if (res.receive === "prompt") {
             Plugins.PushNotifications.requestPermissions().then((r) => {

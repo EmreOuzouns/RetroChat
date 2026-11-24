@@ -1095,3 +1095,19 @@ body.lt.nt #qrm{background:rgba(0,0,0,.6)!important}
 
 /* ===== Faz 6: Bildirimleri Aç Bandı ===== */
 #pushBar{display:none;align-items:center;justify-content:center;gap:6px;margin:0 14px 8px;padding:9px 14px;border-radius:16px;font-size:12.5px;font-weight:700;background:linear-gradient(135deg,rgba(0,229,255,.22),rgba(143,107,255,.32));border:1.5px solid rgba(98,198,238,.65);color:var(--ink,#fff);cursor:pointer;box-shadow:0 4px 14px rgba(80,150,255,.2)}
+
+
+/* ===== Faz 8: Sesli Mesaj & Emoji Tepkileri ===== */
+#vrec{display:none;align-items:center;gap:8px;padding:8px 12px;margin:0 0 6px;border-radius:18px;background:rgba(255,59,48,.16);border:1.5px solid rgba(255,80,70,.55);color:var(--ink,#fff);font-size:13px}
+#vrec.show{display:flex}
+#vrec button{padding:5px 12px!important;font-size:12px!important;border-radius:14px!important}
+.vrdot{width:10px;height:10px;border-radius:50%;background:#ff3b30;box-shadow:0 0 10px #ff3b30;animation:vbl 1s infinite}
+@keyframes vbl{50%{opacity:.25}}
+.vmsg{display:flex;align-items:center;gap:6px;min-width:170px;max-width:240px}
+.vmsg audio{height:32px;flex:1;min-width:120px;max-width:190px}
+.vmsg small{font-size:11px;opacity:.75;white-space:nowrap}
+.rbar{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid rgba(128,128,160,.25);font-size:20px;justify-content:center}
+.rbar span{cursor:pointer;padding:2px 4px;border-radius:8px;transition:transform .12s}
+.rbar span:hover{transform:scale(1.25);background:rgba(128,128,160,.18)}
+.rx{display:inline-flex;align-items:center;gap:3px;margin-top:4px;padding:1px 7px;border-radius:999px;font-size:13px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35)}
+body.lt:not(.nt) .rx{background:rgba(110,90,230,.12);border-color:rgba(110,90,230,.3)}

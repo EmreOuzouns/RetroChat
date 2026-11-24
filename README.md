@@ -24,8 +24,8 @@ The main screen displays your profile card, PIN (with one-tap copy & native shar
 
 <img src="screenshots/chats.png" width="320" alt="RetroChat Main Screen" />
 
-### 2. Real-Time Chat, Animated Backgrounds & Physical Nudge
-Inside a conversation, you can send real-time text, replies, emojis, files (up to 50 MB), GPS location cards, and normal / one-time / timed media. Clicking the **Nudge (🫨)** button shakes the recipient's screen, plays the classic retro alert, and triggers **real physical hardware vibration** (`@capacitor/haptics` on iOS/Android, Web Vibration API on mobile browsers). Choose from **8 animated chat backgrounds** (Ocean, Beach Waves, Rain, Starry Night, Snow, Aurora, Sunset, Synthwave).
+### 2. Real-Time Chat, Voice Messages, Reactions, Animated Backgrounds & Physical Nudge
+Inside a conversation, you can send real-time text, **voice messages (🎤)**, **live emoji reactions** (`❤️ 😂 😮 😢 🙏 👍`), replies, files (up to 50 MB), GPS location cards, and normal / one-time / timed media. Clicking the **Nudge (🫨)** button shakes the recipient's screen, plays the classic retro alert, and triggers **real physical hardware vibration** (`@capacitor/haptics` on iOS/Android, Web Vibration API on mobile browsers). Choose from **8 animated chat backgrounds** (Ocean, Beach Waves, Rain, Starry Night, Snow, Aurora, Sunset, Synthwave).
 
 <img src="screenshots/chat-room.png" width="320" alt="RetroChat Conversation & Night Mode" />
 
@@ -39,8 +39,9 @@ Settings are structured as full-screen mobile subpages (**Profile**, **Appearanc
 
 <img src="screenshots/settings.png" width="320" alt="RetroChat Appearance & Theme Settings" />
 
-### 5. Real-Time Voice & Video Calls (WebRTC) + Live Mini-Games
-- **Voice & Video Calls (`webrtc.js`):** Full-screen incoming call screen (Accept / Decline with custom ringtone and vibration), active call overlay with mute, camera toggle, front/rear camera flip, minimize-to-chat bar, and automatic call history logging (Incoming, Outgoing, Missed, Unanswered).
+### 5. Real-Time Voice & Video Calls (WebRTC + TURN) + Background Push + Live Mini-Games
+- **Voice & Video Calls (`webrtc.js`):** Full-screen incoming call screen (Accept / Decline with custom ringtone and vibration), active call overlay with mute, camera toggle, front/rear camera flip, minimize-to-chat bar, **dynamic STUN/TURN relay** (`/rtc/ice-servers`) for strict 4G/5G networks, automatic **ICE Restart** across Wi-Fi ↔ mobile handoffs, and automatic call history logging.
+- **Background Web Push Notifications (`sw.js`, `push.js`):** Receive messages, nudges, and incoming call alerts with custom vibration patterns and app icon unread badges (`App Badge`) even when RetroChat is closed.
 - **Live Multiplayer Mini-Games (`games.js`):** Invite friends directly from chat to play **Tic-Tac-Toe (XOX)**, **Rock-Paper-Scissors**, and **Connect 4** in real time with synchronized boards and score tracking.
 
 ### 6. Cross-Platform Download Page (`/indir`)

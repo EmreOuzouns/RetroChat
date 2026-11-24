@@ -32,7 +32,7 @@ let replyTo=null,typing={};
 const lastOf=f=>{for(let i=f.h.length-1;i>=0;i--)if(!f.h[i].del)return f.h[i];return null};
 const tk=m=>m.me&&m.k!="n"?`<span class="tk ${m.st==2&&st.set.read?"rd":""}"><svg viewBox="0 0 18 10" width="${m.st>=1?18:12}" height="10"><path d="M1 5.5l3 3L10 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>${m.st>=1?'<path d="M7 5.5l3 3L16 1.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>':""}</svg></span>`:"";
 const colp={on:0,off:0};
-function row(f,i){const l=lastOf(f);const cc=calls[f.pin];const sub=cc&&cc.on?(cc.t=="video"?'<svg class="si" viewBox="0 0 24 24"><rect x="2" y="6" width="13" height="12" rx="2.5" fill="currentColor"/><path d="M16 10l6-3v10l-6-3z" fill="currentColor"/></svg>Görüntülü görüşmede':'<svg class="si" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" fill="currentColor"/></svg>Sesli görüşmede'):typing[f.pin]?'<span style="color:var(--cy)">yazıyor…</span>':l?(l.k=="c"?l.txt:l.k=="n"?"😵‍💫 Titreşim":(l.me?tk(l)+" ":"")+(l.med?medLabel(l):l.img?"📷 Fotoğraf":esc(l.t||""))):(f.np?"🎵 "+esc(f.np):"");return `<div class="c ${i==sel?"sel":""}" onclick="pick(${i})"><div class="av ${stc(f)}" onclick="event.stopPropagation();openPF(${i})">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${sub||"..."}</small></div><div class="cr"><span class="tm">${l&&l.at||""}</span>${f.u?`<span class="bdg">${f.u}</span>`:""}</div><svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`}
+function row(f,i){const l=lastOf(f);const cc=calls[f.pin];const sub=cc&&cc.on?(cc.t=="video"?'<svg class="si" viewBox="0 0 24 24"><rect x="2" y="6" width="13" height="12" rx="2.5" fill="currentColor"/><path d="M16 10l6-3v10l-6-3z" fill="currentColor"/></svg>Görüntülü görüşmede':'<svg class="si" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L9 11a16 16 0 0 0 6 6l1.4-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" fill="currentColor"/></svg>Sesli görüşmede'):typing[f.pin]?'<span style="color:var(--cy)">yazıyor…</span>':l?(l.k=="c"?l.txt:l.k=="n"?"😵‍💫 Titreşim":(l.me?tk(l)+" ":"")+(l.aud?"🎤 Sesli mesaj":l.med?medLabel(l):l.img?"📷 Fotoğraf":esc(l.t||""))):(f.np?"🎵 "+esc(f.np):"");return `<div class="c ${i==sel?"sel":""}" onclick="pick(${i})"><div class="av ${stc(f)}" onclick="event.stopPropagation();openPF(${i})">${avH(f)}</div><div class="ci"><b>${esc(f.n)}</b><small>${sub||"..."}</small></div><div class="cr"><span class="tm">${l&&l.at||""}</span>${f.u?`<span class="bdg">${f.u}</span>`:""}</div><svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`}
 function tgl(g){colp[g]=!colp[g];renderList()}
 function renderList(){const q=($("q").value||"").toLowerCase();const items=st.friends.map((f,i)=>({f,i})).filter(o=>o.f.n.toLowerCase().includes(q)||o.f.pin.toLowerCase().includes(q));const G=[["on","ONLINE","#00e676",items.filter(o=>o.f.s!="off")],["off","OFFLINE","#8b90b5",items.filter(o=>o.f.s=="off")]];$("list").innerHTML=G.filter(g=>g[3].length).map(g=>{const u=g[3].reduce((n,o)=>n+(o.f.u||0),0);return `<div class="gh" onclick="tgl('${g[0]}')"><span class="gd" style="color:${g[2]};background:${g[2]}"></span> ${g[1]} (${g[3].length})${colp[g[0]]&&u?`<span class="bdg">${u}</span>`:""}<span class="ga">${colp[g[0]]?"▸":"▾"}</span></div>`+(colp[g[0]]?"":g[3].map(o=>row(o.f,o.i)).join(""))}).join("")||'<div style="padding:14px;opacity:.6;font-size:13px">Kişi bulunamadı</div>'}
 function renderMsgs(){const f=st.friends[sel];
@@ -43,7 +43,7 @@ $("hs").innerHTML=typing[f.pin]?"yazıyor…":f.np?'<svg class="si" viewBox="0 0
 let html=st.set.timed?'<div class="nd">⏳ Süreli mesajlar açık: 24 saat konuşulmazsa mesajlar herkesten silinir</div>':"",last=null,lastRecv=null;
 f.h.forEach(m=>{if(m.k=="c"){html+=`<div class="nd">${esc(m.txt)}</div>`;last=null;return}if(m.k=="n"){html+=`<div class="nd">${m.me?"Titreşim Gönderdin 😍":"Titreşim Alındı 🤓"}</div>`;last=null;return}
 if(last!==m.me){html+=`<div class="who${m.me?" mine":""}">${esc(m.me?st.set.name:f.n)}:</div>`;last=m.me}
-const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>");
+const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.aud&&window.RetroVoice?RetroVoice.renderHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>")+(m.rx?`<div><span class="rx">${esc(m.rx)}</span></div>`:"");
 html+=`<div class="ml ${m.me?"mine":""}" onclick="menu(event,'${m.id}')"><span class="th">${m.me?myAv():avH(f)}</span><div class="bub"><span class="bl">•</span><span class="bt">${body}</span><i>${m.at}${m.del?"":tk(m)}</i></div></div>`;if(!m.me)lastRecv=m.at});
 if(lastRecv)html+=`<div class="lr">Son alınan ileti zamanı: ${new Date().toLocaleDateString("tr-TR")} - ${lastRecv}.</div>`;
 if(typing[f.pin])html+='<div class="tb"><i></i><i></i><i></i></div>';
@@ -52,7 +52,8 @@ function pick(i){sel=i;st.friends[i].u=0;$("app").classList.add("open");applyBg(
 $("back").onclick=()=>{$("app").classList.remove("open");applyBg()};
 $("q").oninput=renderList;
 const fm=id=>st.friends[sel].h.find(x=>x.id==id);
-function menu(e,id){e.stopPropagation();const m=fm(id);if(!m||m.del)return;const mn=$("menu");mn.innerHTML=`<button onclick="setRep('${id}')">↩ Yanıtla</button><button onclick="cp('${id}')">⧉ Kopyala</button>`+(m.me?`<button onclick="dl('${id}')">🗑 Sil</button>`:"");mn.style.left=Math.min(e.clientX,innerWidth-150)+"px";mn.style.top=Math.min(e.clientY,innerHeight-130)+"px";mn.classList.add("show")}
+function reactMsg(id,em){const m=fm(id);if(!m||m.del)return;m.rx=m.rx===em?"":em;RetroTransport.sendReaction(st.friends[sel],id,m.rx);save();renderMsgs()}
+function menu(e,id){e.stopPropagation();const m=fm(id);if(!m||m.del)return;const mn=$("menu");const rbar='<div class="rbar">'+["❤️","😂","😮","😢","🙏","👍"].map(x=>`<span onclick="reactMsg('${id}','${x}')">${x}</span>`).join("")+'</div>';mn.innerHTML=rbar+`<button onclick="setRep('${id}')">↩ Yanıtla</button><button onclick="cp('${id}')">⧉ Kopyala</button>`+(m.me?`<button onclick="dl('${id}')">🗑 Sil</button>`:"");mn.style.left=Math.min(e.clientX,innerWidth-210)+"px";mn.style.top=Math.min(e.clientY,innerHeight-175)+"px";mn.classList.add("show")}
 document.addEventListener("click",()=>$("menu").classList.remove("show"));
 function setRep(id){const m=fm(id);replyTo=m.med?medLabel(m):m.img&&!m.t?"📷 Fotoğraf":m.t;$("rep").innerHTML=`<span>↩ ${esc(replyTo)}</span><span style="cursor:pointer" onclick="clearRep()">✕</span>`;$("rep").classList.add("show");$("in").focus()}
 function clearRep(){replyTo=null;$("rep").classList.remove("show")}
@@ -203,7 +204,7 @@ function fileHTML(m){const d=m.file,u=vmem[m.id],y=d.type||"",ic=/image/.test(y)
 function locHTML(m){const d=m.loc;return `<a class="lc" href="https://www.google.com/maps?q=${d.lat},${d.lon}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><svg viewBox="0 0 120 70" width="96" height="56"><rect width="120" height="70" rx="8" fill="rgba(255,255,255,.1)"/><path d="M0 22H120M0 46H120M30 0V70M60 0V70M90 0V70" stroke="rgba(255,255,255,.2)" stroke-width="1"/><path d="M60 12a12 12 0 0 1 12 12c0 10-12 24-12 24S48 34 48 24a12 12 0 0 1 12-12z" fill="#3ddc84" stroke="#fff" stroke-width="1.5"/><circle cx="60" cy="24" r="4.5" fill="#fff"/></svg><span>📍 Konum<small>${d.lat}, ${d.lon}${d.acc?" · ±"+d.acc+" m":""}</small></span></a>`}
 $("at").onclick=e=>{e.stopPropagation();$("ap").classList.toggle("show")};
 document.addEventListener("click",e=>{if(!e.target.closest("#ap"))$("ap").classList.remove("show")});
-$("ap").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;$("ap").classList.remove("show");const a=b.dataset.a;if(a=="gal")$("file").click();else if(a=="doc")$("docF").click();else sendLoc()};
+$("ap").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;$("ap").classList.remove("show");const a=b.dataset.a;if(a=="gal")$("file").click();else if(a=="doc")$("docF").click();else if(a=="aud"&&window.RetroVoice)RetroVoice.startRec();else sendLoc()};
 $("docF").onchange=e=>{const fl=e.target.files[0];e.target.value="";if(!fl)return;if(fl.size>50*1024*1024)return toast("Dosya en fazla 50 MB olabilir");const f=st.friends[sel],m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,file:{name:fl.name,size:fl.size,type:fl.type}};vmem[m.id]=URL.createObjectURL(fl);f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)};
 function sendLoc(){if(!navigator.geolocation)return toast("Bu cihazda konum desteği yok");toast("Konum alınıyor…");navigator.geolocation.getCurrentPosition(pos=>{const f=st.friends[sel],m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,loc:{lat:+pos.coords.latitude.toFixed(5),lon:+pos.coords.longitude.toFixed(5),acc:Math.round(pos.coords.accuracy)}};f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)},()=>toast("Konum alınamadı. Konum izni verdiğinden emin ol"),{enableHighAccuracy:true,timeout:10000})}
 let nbT=0,nbF=null;
@@ -617,6 +618,16 @@ RetroTransport.init({
       renderMsgs();
     }
   },
+  onReaction: (fromPin, msgId, emoji) => {
+    const f = st.friends.find((x) => x.pin === fromPin);
+    if (!f) return;
+    const m = f.h.find((x) => x.id === msgId);
+    if (m) {
+      m.rx = emoji || "";
+      save();
+      renderMsgs();
+    }
+  },
   onCallEvent: (ev) => {
     if (window.RetroCalls) RetroCalls.handleEvent(ev);
   },
@@ -712,6 +723,24 @@ if (window.RetroPush) {
     const totalUnread = st.friends.reduce((n, f) => n + (f.u || 0), 0);
     RetroPush.updateBadge(totalUnread);
   };
+}
+
+if (window.RetroVoice) {
+  RetroVoice.init({
+    getState: () => st,
+    esc,
+    toast,
+    onVoiceReady: (aud) => {
+      const f = st.friends[sel];
+      if (!f) return;
+      const m = { id: uid(), me: 1, t: "", at: t(), st: 0, r: replyTo, aud };
+      f.h.push(m);
+      clearRep();
+      save();
+      renderMsgs();
+      RetroTransport.sendMessage(f, m);
+    },
+  });
 }
 
 $("pfGal").onclick=()=>pickGallery(cbF);

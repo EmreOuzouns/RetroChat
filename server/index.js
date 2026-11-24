@@ -396,7 +396,9 @@ wss.on("connection", (ws) => {
           sendJSON(ws, { type: "delivered", from: to, msgId: data.msg.id });
         }
         const m = data.msg;
-        const preview = m.med
+        const preview = m.aud
+          ? "🎤 Sesli mesaj (" + (m.aud.dur || "0:01") + ")"
+          : m.med
           ? (m.med.mode === "once" ? "👁 Tek seferlik medya" : m.med.k === "vid" ? "🎞 Video" : "📷 Fotoğraf")
           : m.img ? "📷 Fotoğraf"
           : m.file ? "📄 " + (m.file.name || "Dosya")
@@ -439,6 +441,29 @@ wss.on("connection", (ws) => {
       case "media_opened": {
         if (!to || !data.msgId) break;
         sendToPin(to, { type: "media_opened", from, msgId: data.msgId }, true);
+        break;
+      }
+
+      case "reaction": {
+        if (!to || !data.msgId) break;
+        sendToPin(to, { type: "reaction", from, msgId: data.msgId, emoji: data.emoji || "" }, true);
+        if (data.emoji) {
+          sendPushToPin(to, {
+            kind: "msg",
+            from,
+            title: senderName(from),
+            body: `Mesajına ${data.emoji} tepkisi verdi`,
+          });
+        }
+        break;
+      }
+
+      case "native_push_register": {
+        if (data.token && data.platform) {
+          store.nativeTokens = store.nativeTokens || {};
+          store.nativeTokens[from] = { token: String(data.token), platform: String(data.platform), updatedAt: Date.now() };
+          scheduleSave();
+        }
         break;
       }
 

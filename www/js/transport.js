@@ -179,6 +179,9 @@
         case "media_opened":
           if (handlers.onMediaOpened) handlers.onMediaOpened(data.from, data.msgId);
           break;
+        case "reaction":
+          if (handlers.onReaction) handlers.onReaction(data.from, data.msgId, data.emoji || "");
+          break;
         case "game_invite":
         case "game_accept":
         case "game_decline":
@@ -294,6 +297,11 @@
     rawSend({ type: "media_opened", to: friend.pin, msgId });
   }
 
+  function sendReaction(friend, msgId, emoji) {
+    if (config.mode !== "ws" || !friend) return;
+    rawSend({ type: "reaction", to: friend.pin, msgId, emoji: emoji || "" });
+  }
+
   function sendRaw(obj) {
     return rawSend(obj);
   }
@@ -314,6 +322,7 @@
     sendRead,
     deleteForAll,
     sendMediaOpened,
+    sendReaction,
     sendRaw,
   };
 })(window);
