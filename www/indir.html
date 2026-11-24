@@ -4,28 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060918">
-<title>RetroChat — İndir</title>
+<title>RetroChat — Android & iOS İndir</title>
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100dvh;font-family:Inter,Segoe UI,sans-serif;color:#f1f2ff;background:radial-gradient(600px 420px at 15% 10%,rgba(0,229,255,.22),transparent),radial-gradient(600px 420px at 85% 90%,rgba(180,76,255,.26),transparent),#060918;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{width:100%;max-width:420px;background:rgba(16,20,56,.78);border:1.5px solid rgba(98,198,238,.55);border-radius:32px;padding:28px 22px;box-shadow:0 0 28px rgba(0,229,255,.18),0 24px 60px rgba(0,0,0,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);text-align:center}
+.card{width:100%;max-width:430px;background:rgba(16,20,56,.78);border:1.5px solid rgba(98,198,238,.55);border-radius:32px;padding:28px 22px;box-shadow:0 0 28px rgba(0,229,255,.18),0 24px 60px rgba(0,0,0,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);text-align:center}
 .ico{width:84px;height:84px;border-radius:22px;margin:0 auto 14px;display:block;box-shadow:0 8px 24px rgba(0,229,255,.3)}
 h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 6px;background:linear-gradient(90deg,#00e5ff,#c64cff);-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{font-size:13.5px;color:#b8bce6;line-height:1.5;margin:0 0 20px}
-.badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(0,229,255,.14);border:1px solid rgba(0,229,255,.4);color:#7fe6ff;margin-bottom:18px}
+.sub{font-size:13.5px;color:#b8bce6;line-height:1.5;margin:0 0 18px}
+.badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(0,229,255,.14);border:1px solid rgba(0,229,255,.4);color:#7fe6ff;margin-bottom:16px}
 .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;border-radius:18px;font-size:15px;font-weight:700;text-decoration:none;border:0;cursor:pointer;margin-bottom:10px;transition:transform .15s,box-shadow .15s}
 .btn:active{transform:scale(.98)}
-.btn.pri{background:linear-gradient(135deg,#00c6ff,#8f6bff);color:#fff;box-shadow:0 6px 20px rgba(80,150,255,.4)}
 .btn.and{background:linear-gradient(135deg,#2fd97a,#0fb86a);color:#042414;box-shadow:0 6px 20px rgba(47,217,122,.35)}
-.btn.ios{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.28);color:#fff}
-.btn.dis{opacity:.55;pointer-events:none}
-.box{text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:14px 16px;margin-top:14px;font-size:13px;line-height:1.55;color:#d6dcf8}
-.box b{color:#fff;display:block;margin-bottom:6px;font-size:14px}
+.btn.ios{background:linear-gradient(135deg,#ffffff,#d8e2ff);color:#0d1333;box-shadow:0 6px 20px rgba(180,200,255,.3)}
+.btn.pri{background:linear-gradient(135deg,#00c6ff,#8f6bff);color:#fff;box-shadow:0 6px 20px rgba(80,150,255,.4)}
+.box{text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:14px 16px;margin-top:12px;font-size:12.5px;line-height:1.55;color:#d6dcf8}
+.box b{color:#fff;display:block;margin-bottom:5px;font-size:13.5px}
 .box ol{margin:0;padding-left:18px}
 .box li{margin-bottom:4px}
-.ft{margin-top:18px;font-size:11.5px;color:#8f93c9}
+.ft{margin-top:16px;font-size:11.5px;color:#8f93c9}
 </style>
 </head>
 <body>
@@ -33,74 +32,38 @@ h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 
   <img src="icons/icon.svg" alt="RetroChat" class="ico">
   <h1>RETROCHAT</h1>
   <p class="sub">Yalnızca 8 haneli PIN ile anlık mesajlaşma, gerçek telefon titreşimi, sesli/görüntülü arama ve canlı mini oyunlar.</p>
-  <div id="devBadge" class="badge">Cihaz algılanıyor…</div>
+  <div id="devBadge" class="badge">Android & iOS İndirme Merkezi</div>
 
-  <a href="/" class="btn pri">🚀 Uygulamayı Hemen Aç</a>
-  <a id="apkBtn" href="downloads/retrochat.apk" download class="btn and">🤖 Android İndir (.apk)</a>
-  <a id="tfBtn" href="#" class="btn ios" style="display:none">🍎 iPhone İndir (TestFlight)</a>
+  <a href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.apk" class="btn and">🤖 Android İndir (.apk)</a>
+  <a href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.ipa" class="btn ios">🍎 iOS İndir (.ipa)</a>
+  <a href="/" class="btn pri">🚀 Tarayıcıda Hemen Aç (Web / PWA)</a>
 
-  <div id="iosGuide" class="box" style="display:none">
-    <b>🍎 iPhone'a Uygulama Olarak Ekle (10 sn)</b>
-    <ol>
-      <li>Yukarıdaki <b>Uygulamayı Hemen Aç</b> butonuna bas (Safari ile aç).</li>
-      <li>Alt ortadaki <b>Paylaş (⬆️)</b> simgesine dokun.</li>
-      <li><b>"Ana Ekrana Ekle"</b> seçeneğine bas — ana ekrana RetroChat ikonuyla yerleşir.</li>
-    </ol>
-  </div>
-
-  <div id="andGuide" class="box" style="display:none">
+  <div class="box">
     <b>🤖 Android Kurulumu</b>
     <ol>
-      <li><b>Android İndir (.apk)</b> butonuna basarak kurulum dosyasını indir.</li>
-      <li>İnen dosyaya dokun ve gerekirse <b>"Bu kaynaktan izin ver"</b> seçeneğini aç.</li>
-      <li><b>Yükle</b> butonuna bas — gerçek donanım titreşimiyle hazır!</li>
+      <li><b>Android İndir (.apk)</b> butonuna basarak doğrudan indir.</li>
+      <li>İnen dosyaya dokun ve gerekirse <b>"Bilinmeyen kaynaklara izin ver"</b> seçeneğini açıp <b>Yükle</b> de.</li>
     </ol>
   </div>
 
-  <div class="ft">E-posta veya telefon numarası gerekmez · PIN ile bağlan</div>
+  <div class="box">
+    <b>🍎 iPhone (iOS) Kurulumu</b>
+    <ol>
+      <li><b>En Hızlı (10 sn):</b> Yukarıdan <b>Tarayıcıda Hemen Aç</b> → Safari'de <b>Paylaş (⬆️) → Ana Ekrana Ekle</b>.</li>
+      <li><b>Native (.ipa):</b> <b>iOS İndir (.ipa)</b> ile indirip <b>AltStore / Sideloadly</b> (ücretsiz) veya Apple Developer / TestFlight ile iPhone'una yükle.</li>
+    </ol>
+  </div>
+
+  <div class="ft">E-posta veya telefon gerekmez · PIN ile bağlan</div>
 </div>
 <script>
 const ua = navigator.userAgent || "";
 const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const isAnd = /Android/i.test(ua);
 const badge = document.getElementById("devBadge");
-const apkBtn = document.getElementById("apkBtn");
-const iosGuide = document.getElementById("iosGuide");
-const andGuide = document.getElementById("andGuide");
-
-// TestFlight linkin hazır olduğunda buraya yazılacak
-const TESTFLIGHT_URL = "";
-if (TESTFLIGHT_URL) {
-  const tf = document.getElementById("tfBtn");
-  tf.href = TESTFLIGHT_URL;
-  tf.style.display = "flex";
-}
-
-if (isIOS) {
-  badge.textContent = "🍎 iPhone / iPad algılandı";
-  iosGuide.style.display = "block";
-  apkBtn.style.display = "none";
-} else if (isAnd) {
-  badge.textContent = "🤖 Android cihaz algılandı";
-  andGuide.style.display = "block";
-} else {
-  badge.textContent = "💻 Masaüstü · Mobil Link";
-  iosGuide.style.display = "block";
-  andGuide.style.display = "block";
-}
-
-// APK dosyası sunucuda yoksa butonu bilgilendirici yap
-fetch("downloads/retrochat.apk", { method: "HEAD" })
-  .then((r) => {
-    if (!r.ok) {
-      apkBtn.classList.add("dis");
-      apkBtn.textContent = "🤖 Android APK (Yakında eklenecek)";
-    }
-  })
-  .catch(() => {
-    apkBtn.classList.add("dis");
-    apkBtn.textContent = "🤖 Android APK (Yakında eklenecek)";
-  });
+if (isIOS) badge.textContent = "🍎 iPhone / iPad algılandı";
+else if (isAnd) badge.textContent = "🤖 Android cihaz algılandı";
+else badge.textContent = "💻 Masaüstü · Mobil İndirme Merkezi";
 </script>
 </body>
 </html>

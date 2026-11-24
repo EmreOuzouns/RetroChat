@@ -1,9 +1,12 @@
-name: Build RetroChat Mobile (Android & iOS)
+name: Build & Release RetroChat Mobile (Android APK & iOS IPA)
 
 on:
   workflow_dispatch:
   push:
     branches: [master, main]
+
+permissions:
+  contents: write
 
 jobs:
   build-android:
@@ -21,14 +24,16 @@ jobs:
         run: |
           npm install
           npx cap sync android
-      - name: Build Android Debug APK
+      - name: Build Android APK
         working-directory: android
         run: ./gradlew assembleDebug
-      - name: Upload Android APK
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk retrochat.apk
+      - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: retrochat-android-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: retrochat.apk
 
   build-ios:
     runs-on: macos-14
@@ -41,7 +46,35 @@ jobs:
         run: |
           npm install
           npx cap sync ios
-      - name: Build iOS Simulator Archive (unsigned)
+      - name: Install CocoaPods dependencies
+        working-directory: ios/App
+        run: pod install
+      - name: Build unsigned iOS app & package .ipa
         working-directory: ios/App
         run: |
-          xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r ../../retrochat.ipa Payload
+      - name: Upload iOS IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrochat-ios-ipa
+          path: retrochat.ipa
+
+  release:
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish GitHub Release with direct APK & IPA links
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: RetroChat Latest (Android APK & iOS IPA)
+          make_latest: true
+          files: |
+            artifacts/retrochat-android-apk/retrochat.apk
+            artifacts/retrochat-ios-ipa/retrochat.ipa

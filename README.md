@@ -50,10 +50,12 @@ The `/indir` route automatically detects whether the visitor is on Android, iOS,
 
 ---
 
-## Live App & Download
+## Live App & Direct Downloads
 
 - **24/7 Live Web App & PWA:** [https://retrochat-server-production.up.railway.app](https://retrochat-server-production.up.railway.app)
-- **Mobile Download & Install Page:** [https://retrochat-server-production.up.railway.app/indir](https://retrochat-server-production.up.railway.app/indir)
+- **Download Center (`/indir`):** [https://retrochat-server-production.up.railway.app/indir](https://retrochat-server-production.up.railway.app/indir)
+- **Direct Android Download (`.apk`):** [Download retrochat.apk](https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.apk)
+- **Direct iOS Download (`.ipa`):** [Download retrochat.ipa](https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.ipa)
 
 ---
 
