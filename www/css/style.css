@@ -1058,3 +1058,28 @@ body.lt.nt #qrm{background:rgba(0,0,0,.6)!important}
 #side .gh .ga{margin-left:auto;font-size:13px;opacity:.75}
 #side .gh .bdg{margin-left:6px;min-width:22px;height:18px;line-height:18px;font-size:11px;padding:0 6px}
 #vid{max-height:240px;width:100%;border-radius:14px;background:#000}
+
+
+/* ===== Faz 3: Tam Ekran WebRTC Sesli & Görüntülü Arama Arayüzü ===== */
+#callScr{position:fixed;inset:0;z-index:85;display:none;flex-direction:column;justify-content:space-between;align-items:center;padding:calc(36px + env(safe-area-inset-top,0px)) 20px calc(36px + env(safe-area-inset-bottom,0px));background:radial-gradient(circle at 30% 20%,rgba(60,120,255,.38),transparent 55%),radial-gradient(circle at 80% 80%,rgba(160,70,255,.35),transparent 55%),#070b1a;color:#fff;overflow:hidden}
+#callScr.show{display:flex}
+#remVid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;z-index:0;display:none}
+#locVid{position:absolute;right:14px;top:calc(18px + env(safe-area-inset-top,0px));width:108px;height:152px;border-radius:18px;object-fit:cover;background:#111;border:2px solid rgba(255,255,255,.55);box-shadow:0 8px 24px rgba(0,0,0,.5);transform:scaleX(-1);z-index:3;display:none}
+#cMin{position:absolute;left:16px;top:calc(18px + env(safe-area-inset-top,0px));z-index:4;width:42px;height:42px;border-radius:50%;padding:0;font-size:24px;line-height:1;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:none}
+.call-info{position:relative;z-index:2;text-align:center;margin-top:40px;transition:opacity .25s}
+#callScr.video.active .call-info{margin-top:12px;text-shadow:0 2px 10px rgba(0,0,0,.75)}
+#callScr.video.active .call-av{display:none}
+.call-av{width:116px;height:116px;border-radius:50%;margin:0 auto 18px;display:grid;place-items:center;font-size:56px;overflow:hidden;background:linear-gradient(135deg,#2a3b8f,#5e33b5);border:3px solid rgba(120,230,255,.85);box-shadow:0 0 0 10px rgba(80,200,255,.15),0 0 36px rgba(100,140,255,.55);animation:cpulse 2s infinite}
+.call-av img{width:100%;height:100%;object-fit:cover}
+@keyframes cpulse{0%,100%{box-shadow:0 0 0 8px rgba(80,200,255,.16),0 0 30px rgba(100,140,255,.5)}50%{box-shadow:0 0 0 20px rgba(80,200,255,.04),0 0 44px rgba(140,110,255,.75)}}
+#callName{margin:0;font-size:28px;font-weight:700;letter-spacing:.3px}
+#callSub{margin-top:8px;font-size:15px;opacity:.85}
+.call-acts{position:relative;z-index:3;display:flex;gap:18px;align-items:center;justify-content:center;padding:14px 20px;border-radius:32px;background:rgba(12,18,40,.55);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#callScr.incoming .live-acts{display:none}
+#callScr:not(.incoming) .inc-acts{display:none}
+.cbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:64px;height:64px;padding:0;border-radius:50%;font-size:22px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);color:#fff;box-shadow:none}
+.cbtn span{font-size:10px;font-weight:500;opacity:.9}
+.cbtn.off{background:rgba(255,255,255,.88);color:#141a3a}
+.cbtn.red{background:#ff3b30;border-color:#ff6961;box-shadow:0 0 18px rgba(255,59,48,.55)}
+.cbtn.grn{background:#2fd97a;border-color:#6ff0a6;color:#052814;box-shadow:0 0 18px rgba(47,217,122,.55)}
+@media(min-width:600px){#callScr{inset:auto!important;left:50%!important;top:max(0px,calc((100dvh - 852px)/2))!important;width:393px!important;height:min(852px,100dvh)!important;transform:translateX(-50%);border-radius:0}}

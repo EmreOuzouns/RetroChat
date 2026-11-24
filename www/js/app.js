@@ -616,7 +616,36 @@ RetroTransport.init({
       renderMsgs();
     }
   },
+  onCallEvent: (ev) => {
+    if (window.RetroCalls) RetroCalls.handleEvent(ev);
+  },
 });
+
+if (window.RetroCalls) {
+  RetroCalls.init({
+    getState: () => st,
+    ensureFriendByPin,
+    avH,
+    esc,
+    uid,
+    toast,
+    save,
+    renderMsgs,
+    logCall,
+    ringPlay,
+    ringStop,
+  });
+  const _origStartCall = startCall;
+  startCall = function (ty) {
+    if (RetroTransport.isLive()) {
+      const f = st.friends[sel];
+      if (!f) return;
+      RetroCalls.start(f, ty);
+      return;
+    }
+    _origStartCall(ty);
+  };
+}
 
 $("pfGal").onclick=()=>pickGallery(cbF);
 $("pfCam").onclick=()=>pickCamera(cbF);

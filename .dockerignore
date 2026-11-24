@@ -1,0 +1,8 @@
+.git/
+.tools/
+node_modules/
+server/node_modules/
+server/data/
+android/
+ios/
+*.log
