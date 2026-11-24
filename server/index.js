@@ -124,6 +124,7 @@ const MIME = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".ico": "image/x-icon",
+  ".apk": "application/vnd.android.package-archive",
 };
 
 const server = http.createServer((req, res) => {
@@ -150,7 +151,7 @@ const server = http.createServer((req, res) => {
   }
 
   // Statik www/ dosyalarını sun (hem tarayıcıdan test hem PWA için)
-  let rel = urlPath === "/" ? "/index.html" : urlPath;
+  let rel = urlPath === "/" ? "/index.html" : urlPath === "/indir" ? "/indir.html" : urlPath;
   const safePath = path.normalize(rel).replace(/^(\.\.[/\\])+/, "");
   const fullPath = path.join(WWW_DIR, safePath);
 
