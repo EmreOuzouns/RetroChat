@@ -1445,11 +1445,16 @@ wss.on("connection", (ws) => {
             pulse: 0,
           });
           if (!ok) {
+            // Karşı taraf çevrimdışı olsa bile aramayı hemen kesme: 45 sn boyunca beklet, açarsa anında çalsın!
+            pendingCalls.set(to, {
+              offer: evPayload,
+              ice: [],
+              from,
+              callType: isVid ? "video" : "voice",
+              expiresAt: Date.now() + 45000,
+            });
             if (hasPush || hasNative) {
-              pendingCalls.set(to, { offer: evPayload, ice: [], expiresAt: Date.now() + 45000 });
               startCallRingPulses(to, from, isVid ? "video" : "voice");
-            } else {
-              sendJSON(ws, { type: "call_offline", from: to });
             }
           } else if (hasPush || hasNative) {
             // Telefon ekranı kilitliyken WS geçici açık kalsa bile bildirim çalmaya devam etsin
@@ -1458,7 +1463,25 @@ wss.on("connection", (ws) => {
         } else if (data.type === "call_ice" && !ok && pendingCalls.has(to)) {
           pendingCalls.get(to).ice.push(evPayload);
         } else if (data.type === "call_end") {
-          if (pendingCalls.has(to) || activeRingPulses.has(to)) {
+          const pc = pendingCalls.get(to);
+          if (pc) {
+            // Karşı taraf açmadan kapandıysa çevrimdışı kuyruğuna cevapsız arama kaydı bırak
+            sendToPin(
+              to,
+              {
+                type: "msg",
+                from,
+                senderProfile: publicProfile(from),
+                msg: {
+                  id: "mc_" + Date.now().toString(36),
+                  k: "c",
+                  txt: pc.callType === "video" ? "📵 Cevapsız görüntülü arama" : "📵 Cevapsız sesli arama",
+                },
+              },
+              true
+            );
+          }
+          if (pc || activeRingPulses.has(to)) {
             clearPendingCall(to, true);
           }
           stopCallRingPulses(from, false);

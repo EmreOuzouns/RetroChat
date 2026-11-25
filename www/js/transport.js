@@ -29,7 +29,25 @@
   let pingTimer = null;
   let pongTimer = null;
   let retryDelay = 1500;
+  const OUTBOX_KEY = "rc_outbox";
+  const PERSIST_TYPES = new Set([
+    "msg", "group_msg", "nudge", "group_nudge", "reaction", "group_reaction",
+    "delete_for_all", "group_delete", "edit_msg", "group_edit", "pin_msg",
+    "group_pin", "read", "add_friend_pin",
+  ]);
   let outbox = [];
+  try {
+    const savedOb = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]");
+    if (Array.isArray(savedOb)) outbox = savedOb.slice(-200);
+  } catch (e) {}
+
+  function saveOutbox() {
+    try {
+      const durable = outbox.filter((x) => x && PERSIST_TYPES.has(x.type)).slice(-200);
+      if (durable.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(durable));
+      else localStorage.removeItem(OUTBOX_KEY);
+    } catch (e) {}
+  }
   let getStateFn = null;
 
   function stopHeartbeat() {
@@ -124,14 +142,18 @@
     if (config.mode === "ws") {
       outbox.push(obj);
       if (outbox.length > 200) outbox.shift();
+      saveOutbox();
     }
     return false;
   }
 
   function flushOutbox() {
+    let sent = false;
     while (outbox.length && ws && ws.readyState === 1 && authed) {
       ws.send(JSON.stringify(outbox.shift()));
+      sent = true;
     }
+    if (sent) saveOutbox();
   }
 
   function connect() {
@@ -343,7 +365,8 @@
       stopHeartbeat();
       connected = false;
       authed = false;
-      if (handlers.onStatus) handlers.onStatus("offline", "Yeniden bağlanıyor…");
+      const offLabel = navigator.onLine === false ? "Çevrimdışı Mod · Mesajlar kuyruğa alınır" : "Yeniden bağlanıyor…";
+      if (handlers.onStatus) handlers.onStatus("offline", offLabel);
       scheduleReconnect();
     };
 
