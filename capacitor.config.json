@@ -3,8 +3,10 @@
   "appName": "RetroChat",
   "webDir": "www",
   "server": {
+    "url": "https://retrochat-server-production.up.railway.app",
     "androidScheme": "https",
-    "iosScheme": "capacitor"
+    "iosScheme": "capacitor",
+    "allowNavigation": ["retrochat-server-production.up.railway.app", "accounts.spotify.com"]
   },
   "plugins": {
     "PushNotifications": {

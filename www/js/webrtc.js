@@ -60,15 +60,47 @@
     return FALLBACK_ICE;
   }
 
+  async function resetCameraZoom(stream) {
+    try {
+      const vt = stream && stream.getVideoTracks && stream.getVideoTracks()[0];
+      if (!vt || !vt.getCapabilities || !vt.applyConstraints) return;
+      const caps = vt.getCapabilities();
+      if (caps && caps.zoom && typeof caps.zoom.min === "number") {
+        await vt.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+      }
+    } catch (e) {}
+  }
+
+  async function boostVideoQuality(peer) {
+    try {
+      if (!peer || !peer.getSenders) return;
+      const sender = peer.getSenders().find((s) => s.track && s.track.kind === "video");
+      if (!sender || !sender.getParameters || !sender.setParameters) return;
+      const params = sender.getParameters();
+      if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+      params.encodings[0].maxBitrate = 2500000; // 2.5 Mbps HD
+      params.encodings[0].maxFramerate = 30;
+      params.degradationPreference = "maintain-resolution";
+      await sender.setParameters(params);
+    } catch (e) {}
+  }
+
   async function getMedia(type, facing) {
     const constraints = {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       video:
         type === "video"
-          ? { facingMode: facing || "user", width: { ideal: 720 }, height: { ideal: 1280 } }
+          ? {
+              facingMode: facing || "user",
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: { ideal: 30, max: 30 },
+            }
           : false,
     };
-    return await navigator.mediaDevices.getUserMedia(constraints);
+    const s = await navigator.mediaDevices.getUserMedia(constraints);
+    if (type === "video") await resetCameraZoom(s);
+    return s;
   }
 
   async function tryIceRestart() {
@@ -183,6 +215,7 @@
       state.timer = setInterval(updateUI, 1000);
     }
     state.reconnecting = false;
+    if (state.type === "video" && pc) boostVideoQuality(pc);
     updateUI();
   }
 
@@ -241,6 +274,7 @@
     $("cCam").classList.toggle("off", state.camOff);
     $("cCam").style.display = isVid ? "" : "none";
     $("cFlip").style.display = isVid ? "" : "none";
+    if ($("cFit")) $("cFit").style.display = isVid && state.phase === "active" ? "" : "none";
     $("locVid").style.display = isVid && !state.camOff ? "block" : "none";
     $("remVid").style.display = isVid && state.phase === "active" ? "block" : "none";
   }
@@ -438,11 +472,18 @@
     state.facing = state.facing === "user" ? "environment" : "user";
     try {
       const ns = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: state.facing },
+        video: {
+          facingMode: state.facing,
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        },
       });
+      await resetCameraZoom(ns);
       const newTrack = ns.getVideoTracks()[0];
       const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
       if (sender) await sender.replaceTrack(newTrack);
+      boostVideoQuality(pc);
       localStream.getVideoTracks().forEach((t) => {
         t.stop();
         localStream.removeTrack(t);
@@ -598,6 +639,15 @@
     $("cCam").onclick = toggleCam;
     $("cFlip").onclick = flipCam;
     $("cMin").onclick = minimize;
+    if ($("cFit")) {
+      $("cFit").onclick = () => {
+        const rv = $("remVid");
+        if (!rv) return;
+        const filled = rv.classList.toggle("fill");
+        $("cFit").textContent = filled ? "⊟" : "⛶";
+        ctx.toast(filled ? "Ekranı doldur" : "Tam kadraj (zoom yok)");
+      };
+    }
     // Görüşme sırasında ağ değişirse (Wi-Fi <-> 4G/5G) ICE Restart dene
     global.addEventListener("online", () => {
       if (state && state.phase === "active") tryIceRestart();
