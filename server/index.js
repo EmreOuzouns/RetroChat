@@ -503,6 +503,22 @@ function sanitizeFileName(raw) {
   return base || "dosya";
 }
 
+let _cachedAppMeta = null;
+function getAppVersionMeta() {
+  if (_cachedAppMeta) return _cachedAppMeta;
+  let version = "retrochat-v22";
+  let assets = [];
+  try {
+    const swSrc = fs.readFileSync(path.join(WWW_DIR, "sw.js"), "utf8");
+    const m = /const\s+CACHE\s*=\s*"([^"]+)"/.exec(swSrc);
+    if (m) version = m[1];
+    const am = /const\s+ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(swSrc);
+    if (am) assets = Array.from(am[1].matchAll(/"([^"]+)"/g), (x) => x[1]);
+  } catch (e) {}
+  _cachedAppMeta = { version, label: version.replace(/^retrochat-/, ""), assets };
+  return _cachedAppMeta;
+}
+
 // MIME tipleri (www statik servisi için)
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -549,23 +565,15 @@ const server = http.createServer((req, res) => {
   }
 
   if (urlPath === "/version") {
-    let version = "retrochat-v16";
-    let assets = [];
-    try {
-      const swSrc = fs.readFileSync(path.join(WWW_DIR, "sw.js"), "utf8");
-      const m = /const\s+CACHE\s*=\s*"([^"]+)"/.exec(swSrc);
-      if (m) version = m[1];
-      const am = /const\s+ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(swSrc);
-      if (am) {
-        assets = Array.from(am[1].matchAll(/"([^"]+)"/g), (x) => x[1]);
-      }
-    } catch (e) {}
-    const label = version.replace(/^retrochat-/, "");
+    const meta = getAppVersionMeta();
+    const versionedAssets = meta.assets.map((a) =>
+      /\.(js|css)$/.test(a) ? `${a}?v=${encodeURIComponent(meta.version)}` : a
+    );
     res.writeHead(200, {
       "Content-Type": "application/json",
       "Cache-Control": "no-store, no-cache, must-revalidate",
     });
-    return res.end(JSON.stringify({ ok: true, version, label, assets }));
+    return res.end(JSON.stringify({ ok: true, version: meta.version, label: meta.label, assets: versionedAssets }));
   }
 
   if (urlPath === "/rtc/ice-servers") {
@@ -743,6 +751,19 @@ const server = http.createServer((req, res) => {
   if (fullPath.startsWith(WWW_DIR) && fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
     const ext = path.extname(fullPath).toLowerCase();
     const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
+    // index.html'e otomatik sürüm etiketi ve ?v=... cache-buster enjekte et (eski JS/CSS kalmasını %100 önler)
+    if (rel === "/index.html") {
+      const meta = getAppVersionMeta();
+      const vq = encodeURIComponent(meta.version);
+      let html = fs.readFileSync(fullPath, "utf8");
+      html = html
+        .replace("</head>", `<meta name="rc-ver" content="${meta.version}"></head>`)
+        .replace(/(href="css\/[^"?]+)(")/g, `$1?v=${vq}$2`)
+        .replace(/(src="js\/[^"?]+)(")/g, `$1?v=${vq}$2`);
+      headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+      res.writeHead(200, headers);
+      return res.end(html);
+    }
     if (ext === ".html" || ext === ".js" || ext === ".css" || ext === ".json") {
       headers["Cache-Control"] = "no-cache, must-revalidate";
     }

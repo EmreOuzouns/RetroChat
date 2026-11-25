@@ -229,13 +229,16 @@
       if (!data || !data.type) return;
 
       switch (data.type) {
-        case "auth_ok":
+        case "auth_ok": {
           authed = true;
           startHeartbeat();
-          if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin + " · v21");
+          const vm = document.querySelector('meta[name="rc-ver"]');
+          const vLbl = vm ? " · " + vm.getAttribute("content").replace(/^retrochat-/, "") : "";
+          if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin + vLbl);
           if (handlers.onAuthOk) handlers.onAuthOk(data.presences || [], data.groups || [], data.requests || [], data.sentRequests || []);
           flushOutbox();
           break;
+        }
         case "pong":
           clearTimeout(pongTimer);
           pongTimer = null;

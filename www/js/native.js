@@ -150,6 +150,11 @@
     }
   }
 
+  function getRunningVersion() {
+    const m = document.querySelector('meta[name="rc-ver"]');
+    return (m && m.getAttribute("content")) || "";
+  }
+
   async function checkUpdate(manual) {
     if (!/^https?:$/.test(location.protocol)) return;
     try {
@@ -158,32 +163,25 @@
       const info = await r.json();
       if (!info || !info.version) return;
 
+      const running = getRunningVersion();
+      const runLabel = running ? running.replace(/^retrochat-/, "") : "eski";
       const sub = $("sUpdSub");
-      if (sub) sub.textContent = "Mevcut sürüm: " + (info.label || info.version);
-
-      let saved = null;
-      try { saved = localStorage.getItem(VER_KEY); } catch (e) {}
-
-      if (!saved) {
-        // İlk kez bu güncelleyiciyle açılıyorsa mevcut sürümü kaydet
-        try { localStorage.setItem(VER_KEY, info.version); } catch (e) {}
-        if (manual) {
-          if ($("set")) $("set").classList.remove("show");
-          showUpdateBar(info);
-          applyUpdate();
-        }
-        return;
+      if (sub) {
+        sub.textContent = running === info.version
+          ? "Güncel sürüm: " + (info.label || info.version) + " ✓"
+          : "Mevcut: " + runLabel + " → Yeni: " + (info.label || info.version);
       }
 
-      if (saved !== info.version || (swReg && swReg.waiting)) {
+      if (running !== info.version) {
         showUpdateBar(info);
         if (manual) {
           if ($("set")) $("set").classList.remove("show");
           applyUpdate();
         }
-      } else if (manual) {
-        if (typeof global.toast === "function") {
-          global.toast("✓ Uygulaman en güncel sürümde (" + (info.label || info.version) + ")");
+      } else {
+        if ($("updBar")) $("updBar").style.display = "none";
+        if (manual && typeof global.toast === "function") {
+          global.toast("✓ Uygulaman zaten en güncel sürümde (" + (info.label || info.version) + ")");
         }
       }
     } catch (e) {
