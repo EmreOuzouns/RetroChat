@@ -271,6 +271,8 @@
       ? isVid
         ? "Gelen görüntülü arama…"
         : "Gelen sesli arama…"
+      : state.noPush
+      ? "Çevrimdışı · Karşı tarafın bildirimi kapalı (açınca çalar)"
       : isVid
       ? "Görüntülü aranıyor…"
       : "Sesli aranıyor…";
@@ -640,6 +642,14 @@
       case "call_busy": {
         if (state && state.pin === fromPin) {
           cleanup(true, state.friend.n + " başka bir görüşmede");
+        }
+        break;
+      }
+
+      case "call_ringing_no_push": {
+        if (state && state.pin === fromPin && state.phase === "ringing") {
+          state.noPush = true;
+          updateUI();
         }
         break;
       }

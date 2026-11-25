@@ -356,6 +356,7 @@
         case "call_reject":
         case "call_busy":
         case "call_offline":
+        case "call_ringing_no_push":
           if (handlers.onCallEvent) handlers.onCallEvent(data);
           break;
       }

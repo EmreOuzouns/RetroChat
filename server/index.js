@@ -1455,6 +1455,8 @@ wss.on("connection", (ws) => {
             });
             if (hasPush || hasNative) {
               startCallRingPulses(to, from, isVid ? "video" : "voice");
+            } else {
+              sendJSON(ws, { type: "call_ringing_no_push", from: to });
             }
           } else if (hasPush || hasNative) {
             // Telefon ekranı kilitliyken WS geçici açık kalsa bile bildirim çalmaya devam etsin
