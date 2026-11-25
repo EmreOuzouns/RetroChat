@@ -826,6 +826,7 @@ wss.on("connection", (ws) => {
 
       sendJSON(ws, { type: "auth_ok", pin, presences, groups, requests, sentRequests });
       broadcastPresence(pin);
+      console.log(`[WS] AUTH ${pin} friends=${friendPins.length} online=${clients.size}`);
 
       // Çevrimdışı kuyrukta bekleyen mesaj/olayları teslim et
       const pending = store.queue[pin];
@@ -1083,6 +1084,7 @@ wss.on("connection", (ws) => {
           { type: "msg", from, msg: data.msg, senderPubKey, senderProfile, timed: !!data.timed },
           true
         );
+        console.log(`[WS] MSG ${from}->${to} delivered=${delivered} e2ee=${!!data.msg.e2ee}`);
         if (delivered && data.msg.id) {
           sendJSON(ws, { type: "delivered", from: to, msgId: data.msg.id });
         }
@@ -1433,6 +1435,7 @@ wss.on("connection", (ws) => {
         const evPayload = { ...data, from };
         const ok = sendToPin(to, evPayload, false);
         if (data.type === "call_offer") {
+          console.log(`[WS] CALL_OFFER ${from}->${to} type=${data.callType} online=${ok}`);
           const isVid = data.callType === "video";
           const hasPush = !!(store.pushSubs[to] && store.pushSubs[to].length);
           const hasNative = !!(store.nativeTokens[to] && store.nativeTokens[to].length);

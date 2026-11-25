@@ -110,14 +110,14 @@
       const total = assets.length;
       let done = 0;
       for (const a of assets) {
-        setProgress(8 + (done / total) * 76, `Güncel dosyalar indiriliyor (${done + 1}/${total})…`);
+        setProgress(8 + (done / total) * 72, `Güncel dosyalar indiriliyor (${done + 1}/${total})…`);
         try {
-          await fetch(a + (a.includes("?") ? "&" : "?") + "_u=" + Date.now(), { cache: "reload" });
+          await fetch(a, { cache: "reload" });
         } catch (e) {}
         done++;
       }
 
-      setProgress(88, "Önbellek temizleniyor…");
+      setProgress(84, "Eski önbellek temizleniyor…");
       if ("caches" in global) {
         try {
           const keys = await caches.keys();
@@ -125,19 +125,21 @@
         } catch (e) {}
       }
 
-      setProgress(94, "Yeni sürüm etkinleştiriliyor…");
-      if (swReg) {
-        try { await swReg.update(); } catch (e) {}
-        if (swReg.waiting) {
-          try { swReg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
-        }
+      setProgress(92, "Yeni sürüm etkinleştiriliyor…");
+      if ("serviceWorker" in navigator) {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        } catch (e) {}
       }
 
       if (info && info.version) {
         try { localStorage.setItem(VER_KEY, info.version); } catch (e) {}
       }
       setProgress(100, "✓ Güncelleme tamamlandı! Yenileniyor…");
-      setTimeout(() => location.reload(), 450);
+      setTimeout(() => {
+        location.replace(location.pathname + "?v=" + Date.now());
+      }, 450);
     } catch (e) {
       updating = false;
       if (btn) {
@@ -192,6 +194,14 @@
   }
 
   function initUpdaterUI() {
+    try {
+      const sp = new URLSearchParams(location.search);
+      if (sp.has("v")) {
+        sp.delete("v");
+        const qs = sp.toString();
+        history.replaceState(null, "", location.pathname + (qs ? "?" + qs : ""));
+      }
+    } catch (e) {}
     if ($("updGo")) $("updGo").onclick = applyUpdate;
     if ($("sUpdRow")) $("sUpdRow").onclick = () => checkUpdate(true);
     setTimeout(() => checkUpdate(false), 700);

@@ -232,7 +232,7 @@
         case "auth_ok":
           authed = true;
           startHeartbeat();
-          if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin);
+          if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin + " · v20");
           if (handlers.onAuthOk) handlers.onAuthOk(data.presences || [], data.groups || [], data.requests || [], data.sentRequests || []);
           flushOutbox();
           break;
