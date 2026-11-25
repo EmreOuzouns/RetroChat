@@ -503,10 +503,29 @@ function sanitizeFileName(raw) {
   return base || "dosya";
 }
 
+const ASSET_LABELS = {
+  "/index.html": "Ana ekran",
+  "/css/style.css": "Arayüz tasarımı",
+  "/js/app.js": "Uygulama çekirdeği",
+  "/js/transport.js": "Canlı bağlantı motoru",
+  "/js/webrtc.js": "Sesli & görüntülü arama",
+  "/js/crypto.js": "Uçtan uca şifreleme",
+  "/js/push.js": "Arka plan bildirimleri",
+  "/js/native.js": "Güncelleme & cihaz köprüsü",
+  "/js/requests.js": "Kişi ekleme & kurulum",
+  "/js/groups.js": "Grup sohbetleri",
+  "/js/extras.js": "Arama & yedekleme",
+  "/js/games.js": "Mini oyunlar",
+  "/js/voice.js": "Sesli mesaj",
+  "/js/qr.js": "QR kod modülü",
+  "/js/haptics.js": "Titreşim motoru",
+  "/manifest.json": "Uygulama ayarları",
+};
+
 let _cachedAppMeta = null;
 function getAppVersionMeta() {
   if (_cachedAppMeta) return _cachedAppMeta;
-  let version = "retrochat-v22";
+  let version = "retrochat-v24";
   let assets = [];
   try {
     const swSrc = fs.readFileSync(path.join(WWW_DIR, "sw.js"), "utf8");
@@ -515,7 +534,23 @@ function getAppVersionMeta() {
     const am = /const\s+ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(swSrc);
     if (am) assets = Array.from(am[1].matchAll(/"([^"]+)"/g), (x) => x[1]);
   } catch (e) {}
-  _cachedAppMeta = { version, label: version.replace(/^retrochat-/, ""), assets };
+  const files = [];
+  for (const a of assets) {
+    if (a === "/" || a === "/indir.html" || a.startsWith("/icons/")) continue;
+    const fp = path.join(WWW_DIR, a.replace(/^\//, ""));
+    try {
+      const buf = fs.readFileSync(fp);
+      const hash = crypto.createHash("sha256").update(buf).digest("hex").slice(0, 8);
+      files.push({
+        path: a,
+        url: /\.(js|css)$/.test(a) ? `${a}?v=${encodeURIComponent(version)}` : a,
+        name: ASSET_LABELS[a] || path.basename(a),
+        size: buf.length,
+        hash,
+      });
+    } catch (e) {}
+  }
+  _cachedAppMeta = { version, label: version.replace(/^retrochat-/, ""), assets, files };
   return _cachedAppMeta;
 }
 
@@ -566,14 +601,11 @@ const server = http.createServer((req, res) => {
 
   if (urlPath === "/version") {
     const meta = getAppVersionMeta();
-    const versionedAssets = meta.assets.map((a) =>
-      /\.(js|css)$/.test(a) ? `${a}?v=${encodeURIComponent(meta.version)}` : a
-    );
     res.writeHead(200, {
       "Content-Type": "application/json",
       "Cache-Control": "no-store, no-cache, must-revalidate",
     });
-    return res.end(JSON.stringify({ ok: true, version: meta.version, label: meta.label, assets: versionedAssets }));
+    return res.end(JSON.stringify({ ok: true, version: meta.version, label: meta.label, files: meta.files }));
   }
 
   if (urlPath === "/rtc/ice-servers") {

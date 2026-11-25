@@ -56,14 +56,34 @@
     }
   }
 
-  /* ===== Uygulama İçi Güncelleme Kontrolü & İlerleme Çubuğu ===== */
+  /* ===== Uygulama İçi Güncelleme Kontrolü & Gerçek Delta İlerleme Çubuğu ===== */
   const VER_KEY = "rc_app_ver";
+  const HASH_KEY = "rc_file_hashes";
   let swReg = null;
   let latestInfo = null;
   let updating = false;
 
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function fmtKB(bytes) {
+    if (!bytes || bytes < 1024) return Math.max(1, bytes || 0) + " B";
+    if (bytes < 1048576) return Math.round(bytes / 1024) + " KB";
+    return (bytes / 1048576).toFixed(1) + " MB";
+  }
+
+  function loadHashes() {
+    try { return JSON.parse(localStorage.getItem(HASH_KEY) || "{}") || {}; } catch (e) { return {}; }
+  }
+
+  function getChangedFiles(info) {
+    const all = (info && Array.isArray(info.files)) ? info.files : [];
+    const prev = loadHashes();
+    const hasPrev = Object.keys(prev).length > 0;
+    if (!hasPrev) return all;
+    const diff = all.filter((f) => prev[f.path] !== f.hash);
+    return diff.length ? diff : all.slice(0, 1);
   }
 
   function setProgress(pct, stepText) {
@@ -78,8 +98,11 @@
     latestInfo = info;
     const bar = $("updBar");
     if (!bar) return;
-    const lbl = (info && info.label) ? " (" + info.label + ")" : "";
-    if ($("updTxt")) $("updTxt").textContent = "✨ Yeni güncelleme hazır" + lbl + "!";
+    const changed = getChangedFiles(info);
+    const totalBytes = changed.reduce((n, f) => n + (f.size || 0), 0);
+    const lbl = (info && info.label) ? info.label : "yeni";
+    const detail = changed.length ? ` · ${changed.length} bileşen, ${fmtKB(totalBytes)}` : "";
+    if ($("updTxt")) $("updTxt").textContent = `✨ Güncelleme hazır (${lbl}${detail})`;
     if ($("updGo")) {
       $("updGo").disabled = false;
       $("updGo").textContent = "⬇ Güncelle";
@@ -93,9 +116,9 @@
     const btn = $("updGo");
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "Yükleniyor…";
+      btn.textContent = "İndiriliyor…";
     }
-    setProgress(5, "Güncelleme paketi hazırlanıyor…");
+    setProgress(4, "Değişen dosyalar kontrol ediliyor…");
 
     try {
       let info = latestInfo;
@@ -103,21 +126,20 @@
         const r = await fetch("/version?t=" + Date.now(), { cache: "no-store" });
         if (r.ok) info = await r.json();
       }
-      const assets = (info && Array.isArray(info.assets) && info.assets.length)
-        ? info.assets
-        : ["/", "/index.html", "/css/style.css", "/js/app.js", "/js/transport.js", "/js/webrtc.js", "/js/push.js", "/js/requests.js", "/js/native.js"];
+      const files = getChangedFiles(info);
+      const totalBytes = Math.max(1, files.reduce((n, f) => n + (f.size || 1024), 0));
+      let loadedBytes = 0;
 
-      const total = assets.length;
-      let done = 0;
-      for (const a of assets) {
-        setProgress(8 + (done / total) * 72, `Güncel dosyalar indiriliyor (${done + 1}/${total})…`);
+      for (const f of files) {
+        const pct = 6 + (loadedBytes / totalBytes) * 78;
+        setProgress(pct, `${f.name} indiriliyor · ${fmtKB(loadedBytes)} / ${fmtKB(totalBytes)}`);
         try {
-          await fetch(a, { cache: "reload" });
+          await fetch(f.url || f.path, { cache: "reload" });
         } catch (e) {}
-        done++;
+        loadedBytes += (f.size || 1024);
       }
 
-      setProgress(84, "Eski önbellek temizleniyor…");
+      setProgress(88, "Eski önbellek temizleniyor…");
       if ("caches" in global) {
         try {
           const keys = await caches.keys();
@@ -125,7 +147,7 @@
         } catch (e) {}
       }
 
-      setProgress(92, "Yeni sürüm etkinleştiriliyor…");
+      setProgress(94, "Yeni sürüm kuruluyor…");
       if ("serviceWorker" in navigator) {
         try {
           const regs = await navigator.serviceWorker.getRegistrations();
@@ -134,9 +156,16 @@
       }
 
       if (info && info.version) {
-        try { localStorage.setItem(VER_KEY, info.version); } catch (e) {}
+        try {
+          localStorage.setItem(VER_KEY, info.version);
+          if (Array.isArray(info.files)) {
+            const map = {};
+            info.files.forEach((f) => { map[f.path] = f.hash; });
+            localStorage.setItem(HASH_KEY, JSON.stringify(map));
+          }
+        } catch (e) {}
       }
-      setProgress(100, "✓ Güncelleme tamamlandı! Yenileniyor…");
+      setProgress(100, `✓ ${fmtKB(totalBytes)} yüklendi! Uygulama yenileniyor…`);
       setTimeout(() => {
         location.replace(location.pathname + "?v=" + Date.now());
       }, 450);
@@ -180,6 +209,14 @@
         }
       } else {
         if ($("updBar")) $("updBar").style.display = "none";
+        // Güncel sürümdeyse dosya hash haritasını bir kez kaydet (sonraki sürümde sadece değişenler insin)
+        if (Array.isArray(info.files) && Object.keys(loadHashes()).length === 0) {
+          try {
+            const map = {};
+            info.files.forEach((f) => { map[f.path] = f.hash; });
+            localStorage.setItem(HASH_KEY, JSON.stringify(map));
+          } catch (e) {}
+        }
         if (manual && typeof global.toast === "function") {
           global.toast("✓ Uygulaman zaten en güncel sürümde (" + (info.label || info.version) + ")");
         }
