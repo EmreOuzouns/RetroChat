@@ -1,4 +1,5 @@
 const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -66,7 +67,120 @@ if (webpush) {
 // Çevrimdışı kullanıcıya arama geldiğinde 35 sn beklet (bildirime tıklayıp açınca yakalasın)
 const pendingCalls = new Map(); // toPin -> { offer, ice: [], expiresAt }
 
+// Native Android/iOS FCM HTTP v1 (Service Account JWT) + Legacy Server Key desteği (sıfır ek bağımlılık)
+let fcmSA = null;
+try {
+  if (process.env.FCM_SERVICE_ACCOUNT_JSON) {
+    fcmSA = JSON.parse(process.env.FCM_SERVICE_ACCOUNT_JSON);
+  }
+} catch (e) {
+  console.error("FCM_SERVICE_ACCOUNT_JSON parse error:", e.message);
+}
+let fcmTokenCache = { token: null, exp: 0 };
+
+function b64url(input) {
+  return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function httpsJson(urlStr, method, headers, bodyStr) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const req = https.request(
+      { hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search, method, headers },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+      }
+    );
+    req.on("error", reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function getFcmAccessToken() {
+  if (!fcmSA || !fcmSA.client_email || !fcmSA.private_key) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (fcmTokenCache.token && fcmTokenCache.exp > now + 60) return fcmTokenCache.token;
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64url(
+    JSON.stringify({
+      iss: fcmSA.client_email,
+      scope: "https://www.googleapis.com/auth/firebase.messaging",
+      aud: "https://oauth2.googleapis.com/token",
+      exp: now + 3600,
+      iat: now,
+    })
+  );
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(header + "." + claim);
+  const sig = signer.sign(fcmSA.private_key).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const form = `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${header}.${claim}.${sig}`;
+  const res = await httpsJson(
+    "https://oauth2.googleapis.com/token",
+    "POST",
+    { "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(form) },
+    form
+  );
+  if (res.status !== 200) return null;
+  const j = JSON.parse(res.body);
+  fcmTokenCache = { token: j.access_token, exp: now + (j.expires_in || 3500) };
+  return fcmTokenCache.token;
+}
+
+async function sendNativePushToPin(pin, payload) {
+  const entry = store.nativeTokens && store.nativeTokens[pin];
+  if (!entry || !entry.token) return;
+  try {
+    if (fcmSA && fcmSA.project_id) {
+      const accessToken = await getFcmAccessToken();
+      if (!accessToken) return;
+      const body = JSON.stringify({
+        message: {
+          token: entry.token,
+          notification: { title: payload.title || "RetroChat", body: payload.body || "Yeni bildirim" },
+          data: { kind: String(payload.kind || "msg"), from: String(payload.from || "") },
+          android: { priority: "HIGH" },
+        },
+      });
+      const res = await httpsJson(
+        `https://fcm.googleapis.com/v1/projects/${fcmSA.project_id}/messages:send`,
+        "POST",
+        {
+          Authorization: "Bearer " + accessToken,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+        body
+      );
+      if (res.status === 404 || res.body.includes("UNREGISTERED")) {
+        delete store.nativeTokens[pin];
+        scheduleSave();
+      }
+    } else if (process.env.FCM_SERVER_KEY) {
+      const body = JSON.stringify({
+        to: entry.token,
+        priority: "high",
+        notification: { title: payload.title || "RetroChat", body: payload.body || "Yeni bildirim" },
+        data: { kind: String(payload.kind || "msg"), from: String(payload.from || "") },
+      });
+      await httpsJson(
+        "https://fcm.googleapis.com/fcm/send",
+        "POST",
+        {
+          Authorization: "key=" + process.env.FCM_SERVER_KEY,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+        body
+      );
+    }
+  } catch (e) {}
+}
+
 function sendPushToPin(pin, payload) {
+  sendNativePushToPin(pin, payload);
   if (!webpush || !store.vapid) return;
   const subs = store.pushSubs[pin];
   if (!subs || !subs.length) return;
@@ -318,11 +432,13 @@ const server = http.createServer((req, res) => {
       JSON.stringify({
         ok: true,
         service: "retrochat-server",
+        version: "1.2.0",
         onlineUsers: clients.size,
         registeredPins: Object.keys(store.users).length,
         groupsCount: Object.keys(store.groups).length,
         mediaCount: Object.keys(store.media).length,
         pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
+        nativePushReady: !!(fcmSA || process.env.FCM_SERVER_KEY),
         turnReady: true,
         e2eeReady: true,
         uptimeSec: Math.floor(process.uptime()),
