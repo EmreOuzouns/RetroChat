@@ -548,6 +548,26 @@ const server = http.createServer((req, res) => {
     );
   }
 
+  if (urlPath === "/version") {
+    let version = "retrochat-v16";
+    let assets = [];
+    try {
+      const swSrc = fs.readFileSync(path.join(WWW_DIR, "sw.js"), "utf8");
+      const m = /const\s+CACHE\s*=\s*"([^"]+)"/.exec(swSrc);
+      if (m) version = m[1];
+      const am = /const\s+ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(swSrc);
+      if (am) {
+        assets = Array.from(am[1].matchAll(/"([^"]+)"/g), (x) => x[1]);
+      }
+    } catch (e) {}
+    const label = version.replace(/^retrochat-/, "");
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    });
+    return res.end(JSON.stringify({ ok: true, version, label, assets }));
+  }
+
   if (urlPath === "/rtc/ice-servers") {
     const iceServers = [
       { urls: "stun:stun.l.google.com:19302" },
