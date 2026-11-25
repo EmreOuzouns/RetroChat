@@ -299,13 +299,7 @@
       return;
     }
 
-    try {
-      localStream = await getMedia(type, "user");
-    } catch (e) {
-      ctx.toast(type === "video" ? "Kamera veya mikrofon izni gerekli" : "Mikrofon izni gerekli");
-      return;
-    }
-
+    // Arama ekranını anında tam ekran aç (mikrofon/kamera hazırlanırken bile gecikme olmasın)
     state = {
       pin: friend.pin,
       friend,
@@ -321,6 +315,18 @@
       minimized: false,
     };
     pendingIce = [];
+    updateUI();
+
+    try {
+      localStream = await getMedia(type, "user");
+    } catch (e) {
+      cleanup(false, type === "video" ? "Kamera veya mikrofon izni gerekli" : "Mikrofon izni gerekli");
+      return;
+    }
+    if (!state || state.pin !== friend.pin) {
+      if (localStream) { localStream.getTracks().forEach((t) => t.stop()); localStream = null; }
+      return;
+    }
 
     const lv = $("locVid");
     if (lv && type === "video") {
