@@ -42,6 +42,7 @@
       f.e = g.icon || f.e;
       f.owner = g.owner || f.owner;
       f.members = g.members || f.members;
+      if (g.pinned !== undefined) f.pinned = g.pinned;
       f.s = "on";
     }
     ctx.save();
@@ -302,6 +303,14 @@
           ctx.save();
           ctx.renderMsgs();
         }
+        break;
+      }
+      case "group_edit": {
+        if (global.RetroExtras) global.RetroExtras.applyRemoteEdit(ev.groupId, ev.msgId, ev.text);
+        break;
+      }
+      case "group_pin": {
+        if (global.RetroExtras) global.RetroExtras.applyRemotePin(ev.groupId, ev.msgId, ev.preview);
         break;
       }
     }

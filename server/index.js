@@ -234,6 +234,7 @@ function groupPayload(g) {
     name: g.name,
     icon: g.icon || "👥",
     owner: g.owner,
+    pinned: g.pinned || null,
     members: g.members.map((mp) => {
       const p = publicProfile(mp);
       return {
@@ -718,6 +719,39 @@ wss.on("connection", (ws) => {
         break;
       }
 
+      case "edit_msg": {
+        if (!to || !data.msgId) break;
+        const senderPubKey = (store.users[from] && store.users[from].pubKey) || null;
+        sendToPin(
+          to,
+          {
+            type: "edit_msg",
+            from,
+            msgId: data.msgId,
+            text: data.text != null ? String(data.text).slice(0, 4000) : undefined,
+            e2ee: data.e2ee || undefined,
+            senderPubKey,
+          },
+          true
+        );
+        break;
+      }
+
+      case "pin_msg": {
+        if (!to) break;
+        sendToPin(
+          to,
+          {
+            type: "pin_msg",
+            from,
+            msgId: data.msgId || "",
+            preview: String(data.preview || "").slice(0, 120),
+          },
+          true
+        );
+        break;
+      }
+
       case "media_opened": {
         if (!to || !data.msgId) break;
         if (data.mediaId) deleteMediaById(data.mediaId);
@@ -919,6 +953,33 @@ wss.on("connection", (ws) => {
         for (const mp of grp.members) {
           if (mp === from) continue;
           sendToPin(mp, { type: "group_delete", groupId: gid, from, msgId: data.msgId }, true);
+        }
+        break;
+      }
+
+      case "group_edit": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from) || !data.msgId) break;
+        const text = String(data.text || "").slice(0, 4000);
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          sendToPin(mp, { type: "group_edit", groupId: gid, from, msgId: data.msgId, text }, true);
+        }
+        break;
+      }
+
+      case "group_pin": {
+        const gid = String(data.groupId || "").trim().toUpperCase();
+        const grp = store.groups[gid];
+        if (!grp || !grp.members.includes(from)) break;
+        const msgId = String(data.msgId || "");
+        const preview = String(data.preview || "").slice(0, 120);
+        grp.pinned = msgId ? { id: msgId, preview } : null;
+        scheduleSave();
+        for (const mp of grp.members) {
+          if (mp === from) continue;
+          sendToPin(mp, { type: "group_pin", groupId: gid, from, msgId, preview }, true);
         }
         break;
       }

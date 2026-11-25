@@ -46,17 +46,18 @@ let html=st.set.timed?'<div class="nd">⏳ Süreli mesajlar açık: 24 saat konu
 f.h.forEach(m=>{if(m.k=="c"){html+=`<div class="nd">${esc(m.txt)}</div>`;last=null;return}if(m.k=="n"){html+=`<div class="nd">${m.me?"Titreşim Gönderdin 😍":"Titreşim Alındı 🤓"}</div>`;last=null;return}
 if(last!==m.me){html+=`<div class="who${m.me?" mine":""}">${esc(m.me?st.set.name:(m.sn||f.n))}:</div>`;last=m.me}
 const snTag=f.isGroup&&!m.me&&m.sn?`<div class="gsn">${esc(m.sn)}</div>`:"";
-const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':snTag+(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.aud&&window.RetroVoice?RetroVoice.renderHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>")+(m.rx?`<div><span class="rx">${esc(m.rx)}</span></div>`:"");
-html+=`<div class="ml ${m.me?"mine":""}" onclick="menu(event,'${m.id}')"><span class="th">${m.me?myAv():avH(f)}</span><div class="bub"><span class="bl">•</span><span class="bt">${body}</span><i>${m.e2ee&&!m.del?'<span class="elock" title="Uçtan uca şifreli">🔒</span>':""}${m.at}${m.del?"":tk(m)}</i></div></div>`;if(!m.me)lastRecv=m.at});
+const fwdTag=m.fwd?'<div class="fwd-tag">↪ İletildi</div>':"";
+const body=m.del?'<em style="opacity:.6">🚫 Bu mesaj silindi</em>':snTag+fwdTag+(m.r?`<div class="q">${esc(m.r)}</div>`:"")+(m.img?`<img src="${m.img}" class="pic">`:"")+(m.med?medHTML(m):"")+(m.aud&&window.RetroVoice?RetroVoice.renderHTML(m):"")+(m.file?fileHTML(m):"")+(m.loc?locHTML(m):"")+esc(m.t||"").replace(/\n/g,"<br>")+(m.rx?`<div><span class="rx">${esc(m.rx)}</span></div>`:"");
+html+=`<div class="ml ${m.me?"mine":""}" data-mid="${m.id}" onclick="menu(event,'${m.id}')"><span class="th">${m.me?myAv():avH(f)}</span><div class="bub"><span class="bl">•</span><span class="bt">${body}</span><i>${m.ed&&!m.del?'<span class="ed-tag">düzenlendi</span>':""}${m.e2ee&&!m.del?'<span class="elock" title="Uçtan uca şifreli">🔒</span>':""}${m.at}${m.del?"":tk(m)}</i></div></div>`;if(!m.me)lastRecv=m.at});
 if(lastRecv)html+=`<div class="lr">Son alınan ileti zamanı: ${new Date().toLocaleDateString("tr-TR")} - ${lastRecv}.</div>`;
 if(typing[f.pin]||(f.isGroup&&grpTyping[f.pin]))html+='<div class="tb"><i></i><i></i><i></i></div>';
-$("msgs").innerHTML=html;$("msgs").scrollTop=1e9;renderList();updCbar()}
-function pick(i){sel=i;st.friends[i].u=0;$("app").classList.add("open");applyBg();save();renderMsgs()}
-$("back").onclick=()=>{$("app").classList.remove("open");applyBg()};
+$("msgs").innerHTML=html;$("msgs").scrollTop=1e9;renderList();updCbar();if(window.RetroExtras)RetroExtras.renderPinBar()}
+function pick(i){sel=i;st.friends[i].u=0;$("app").classList.add("open");if(window.RetroExtras){RetroExtras.closeSearch();RetroExtras.cancelEdit()}applyBg();save();renderMsgs()}
+$("back").onclick=()=>{if(window.RetroExtras){RetroExtras.closeSearch();RetroExtras.cancelEdit()}$("app").classList.remove("open");applyBg()};
 $("q").oninput=renderList;
 const fm=id=>st.friends[sel].h.find(x=>x.id==id);
 function reactMsg(id,em){const m=fm(id);if(!m||m.del)return;m.rx=m.rx===em?"":em;RetroTransport.sendReaction(st.friends[sel],id,m.rx);save();renderMsgs()}
-function menu(e,id){e.stopPropagation();const m=fm(id);if(!m||m.del)return;const mn=$("menu");const rbar='<div class="rbar">'+["❤️","😂","😮","😢","🙏","👍"].map(x=>`<span onclick="reactMsg('${id}','${x}')">${x}</span>`).join("")+'</div>';mn.innerHTML=rbar+`<button onclick="setRep('${id}')">↩ Yanıtla</button><button onclick="cp('${id}')">⧉ Kopyala</button>`+(m.me?`<button onclick="dl('${id}')">🗑 Sil</button>`:"");mn.style.left=Math.min(e.clientX,innerWidth-210)+"px";mn.style.top=Math.min(e.clientY,innerHeight-175)+"px";mn.classList.add("show")}
+function menu(e,id){e.stopPropagation();const f=st.friends[sel],m=fm(id);if(!m||m.del)return;const mn=$("menu");const isPin=f&&f.pinned&&f.pinned.id===id;const rbar='<div class="rbar">'+["❤️","😂","😮","😢","🙏","👍"].map(x=>`<span onclick="reactMsg('${id}','${x}')">${x}</span>`).join("")+'</div>';mn.innerHTML=rbar+`<button onclick="setRep('${id}')">↩ Yanıtla</button><button onclick="RetroExtras.togglePin('${id}')">📌 ${isPin?"Sabiti kaldır":"Sabitle"}</button><button onclick="RetroExtras.openForward('${id}')">↪ İlet</button><button onclick="cp('${id}')">⧉ Kopyala</button>`+(m.me&&m.t?`<button onclick="RetroExtras.startEdit('${id}')">✏️ Düzenle</button>`:"")+(m.me?`<button onclick="dl('${id}')">🗑 Sil</button>`:"");mn.style.left=Math.min(e.clientX,innerWidth-210)+"px";mn.style.top=Math.min(e.clientY,innerHeight-260)+"px";mn.classList.add("show")}
 document.addEventListener("click",()=>$("menu").classList.remove("show"));
 function setRep(id){const m=fm(id);replyTo=m.aud?"🎤 Sesli mesaj ("+(m.aud.dur||"0:01")+")":m.med?medLabel(m):m.file?"📄 "+m.file.name:m.loc?"📍 Konum":m.img&&!m.t?"📷 Fotoğraf":m.t;$("rep").innerHTML=`<span>↩ ${esc(replyTo)}</span><span style="cursor:pointer" onclick="clearRep()">✕</span>`;$("rep").classList.add("show");$("in").focus()}
 function clearRep(){replyTo=null;$("rep").classList.remove("show")}
@@ -64,7 +65,7 @@ function cp(id){try{navigator.clipboard.writeText(fm(id).t||"")}catch(e){}}
 function dl(id){const m=fm(id);const mid=(m.med&&m.med.mediaId)||(m.aud&&m.aud.mediaId)||(m.file&&m.file.mediaId)||"";m.del=true;m.img=null;m.med=null;m.aud=null;m.file=null;delete vmem[id];RetroTransport.deleteForAll(st.friends[sel],id,mid);save();renderMsgs()}
 const replies=["Selam! 😊","Nasılsın?","Haha doğru 😂","Müzik harika bu arada 🎵","Sonra konuşuruz","Tamamdır 👍"];
 function deliver(f,m,nudge){if(f.s=="off")return;setTimeout(()=>{m.st=1;save();renderMsgs()},500);setTimeout(()=>{typing[f.pin]=1;renderMsgs()},1100);setTimeout(()=>{typing[f.pin]=0;m.st=2;if(nudge){f.h.push({k:"n",me:0,id:uid()});shake()}else f.h.push(Math.random()<.3?{id:uid(),me:0,t:"",at:t(),med:{k:"img",mode:Math.random()<.5?"once":"timed",sec:5,src:genImg()}}:{id:uid(),me:0,t:replies[Math.random()*replies.length|0],at:t()});const viewing=st.friends[sel]===f&&($("app").classList.contains("open"));if(!viewing){f.u=(f.u||0)+1;notify(f,f.h[f.h.length-1])}save();renderMsgs()},2800);if(m.med&&m.med.mode!="normal")setTimeout(()=>{if(m.med&&!m.med.gone){m.med.gone=true;m.med.src=null;delete vmem[m.id];save();renderMsgs()}},7000)}
-function send(img){const v=$("in").value.trim();if(!v&&!img)return;const f=st.friends[sel];const m={id:uid(),me:1,t:v,at:t(),st:0,img:img||null,r:replyTo};f.h.push(m);$("in").value="";grow();clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)}
+function send(img){const v=$("in").value.trim();if(!img&&window.RetroExtras&&RetroExtras.isEditing()){RetroExtras.commitEdit(v);return}if(!v&&!img)return;const f=st.friends[sel];const m={id:uid(),me:1,t:v,at:t(),st:0,img:img||null,r:replyTo};f.h.push(m);$("in").value="";grow();clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)}
 $("send").onclick=()=>send();$("in").onkeydown=e=>{if(e.key=="Enter"&&!e.shiftKey){e.preventDefault();send()}};
 $("nd").onclick=()=>{const f=st.friends[sel];f.h.push({k:"n",me:1,id:uid()});shake();save();renderMsgs();RetroTransport.sendNudge(f)};
 const EC=[["🕒", ""], ["😀", "😀😃😄😁😆😅🤣😂🙂🙃😉😊😇🥰😍🤩😘😗😚😙😋😛😜🤪😝🤑🤗🤭🤫🤔🤐🤨😐😑😶😏😒🙄😬🤥😌😔😪🤤😴😷🤒🤕🤢🤮🤧🥵🥶🥴😵😵‍💫🤯🤠🥳😎🤓🧐😕😟🙁☹️😮😯😲😳🥺🥹😦😧😨😰😥😢😭😱😖😣😞😓😩😫🥱😤😡😠🤬😈👿💀☠️💩🤡👹👺👻👽🤖😮‍💨😺😸😹😻😼😽🙀😿😾"], ["👋", "👋🤚🖐️✋🖖👌🤌🤏✌️🤞🤟🤘🤙👈👉👆🖕👇☝️👍👎✊👊🤛🤜👏🙌👐🤲🤝🙏✍️💅🤳💪🦾🦵🦶👂👃🧠👀👁️👅👄👶🧒👦👧🧑👨👩🧓👴👵🙍🙎🙅🙆💁🙋🙇🤦🤷👮🕵️💂👷🤴👸👳👲🧕🤵👰🤰🤱👼🎅🤶🦸🦹🧙🧚🧛🧜🧝🧞🧟💆💇🚶🏃💃🕺👯"], ["❤️", "❤️🧡💛💚💙💜🖤🤍🤎💔❣️💕💞💓💗💖💘💝💟☮️✝️☪️🕉️☸️✡️🔯☯️♈♉♊♋♌♍♎♏♐♑♒♓💯💢💥💫💦💨🕳️💣💬💭💤🔥✨⭐🌟⚡☄️🌈☀️🌙⭕❌✅❎❓❗‼️⁉️♻️🔴🟠🟡🟢🔵🟣⚫⚪🟤🔶🔷🔺🔻"], ["🐶", "🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🙈🙉🙊🐒🐔🐧🐦🐤🦆🦅🦉🦇🐺🐗🐴🦄🐝🐛🦋🐌🐞🐜🦟🦗🕷️🦂🐢🐍🦎🦖🐙🦑🦐🦀🐡🐠🐟🐬🐳🐋🦈🐊🐅🐆🦓🦍🐘🦏🐪🐫🦒🐃🐂🐄🐎🐖🐏🐑🐐🦌🐕🐩🐈🐓🦃🦚🦜🦢🕊️🐇🦝🦨🦡🦦🐿️🌵🎄🌲🌳🌴🌱🌿☘️🍀🎍🍃🍂🍁🌾🌺🌻🌹🌷🌼🌸💐🍄"], ["🍔", "🍏🍎🍐🍊🍋🍌🍉🍇🍓🍈🍒🍑🥭🍍🥥🥝🍅🍆🥑🥦🥬🥒🌶️🌽🥕🧄🧅🥔🍠🥐🥯🍞🥖🧀🥚🍳🥞🥓🥩🍗🍖🌭🍔🍟🍕🥪🌮🌯🥗🍝🍜🍲🍛🍣🍱🥟🍤🍙🍚🍘🍥🥠🍢🍡🍧🍨🍦🥧🧁🍰🎂🍮🍭🍬🍫🍿🍩🍪🌰🥜🍯🥛🍼☕🍵🧃🥤🍶🍺🍻🥂🍷🥃🍸🍹🍾🧊🥄🍴🍽️"], ["⚽", "⚽🏀🏈⚾🥎🎾🏐🏉🥏🎱🏓🏸🏒🏑🥍🏏⛳🏹🎣🥊🥋🎽🛹⛸️🎿⛷️🏂🏋️🤼🤸⛹️🤺🏇🧘🏄🏊🤽🚣🧗🚵🚴🏆🥇🥈🥉🏅🎖️🎗️🎫🎟️🎪🎭🎨🎬🎤🎧🎼🎹🥁🎷🎺🎸🎻🎲♟️🎯🎳🎮🎰🧩"], ["🚗", "🚗🚕🚙🚌🚎🏎️🚓🚑🚒🚐🚚🚛🚜🛵🏍️🚲🛴🚨🚔🚍🚘🚖🚡🚠🚟🚃🚋🚞🚝🚄🚅🚈🚂🚆🚇🚊🚉✈️🛫🛬🚀🛸🚁🛶⛵🚤🛥️🛳️⛴️🚢⚓⛽🚧🚦🚥🗺️🗿🗽🗼🏰🏯🏟️🎡🎢🎠⛲⛱️🏖️🏝️🏜️🌋⛰️🏔️🗻🏕️⛺🏠🏡🏢🏣🏥🏦🏨🏪🏫🏬🏭🌃🌆🌇🌉🌌🌠🎇🎆"], ["💡", "⌚📱📲💻⌨️🖥️🖨️🖱️💽💾💿📀📷📸📹🎥📞☎️📟📠📺📻🎙️🎚️🎛️⏱️⏲️⏰🕰️⌛⏳📡🔋🔌💡🔦🕯️💸💵💴💶💷💰💳💎⚖️🔧🔨⚒️🛠️⛏️🔩⚙️🔫🔪🗡️🛡️🔮📿🧿💈⚗️🔭🔬💊💉🌡️🧹🧺🧻🚽🚿🛁🔑🗝️🚪🛋️🛏️🖼️🛍️🎁🎈🎀🎉🎊✉️📧📦📪📮📝📁📂📅📆📈📉📊📌📍📎🖇️📏📐✂️🗑️🔒🔓🔍🔎"], ["🏁", "🏁🚩🎌🏴🏳️🏳️‍🌈🏴‍☠️🇹🇷🇦🇿🇩🇪🇬🇧🇺🇸🇫🇷🇮🇹🇪🇸🇯🇵🇰🇷🇨🇳🇷🇺🇧🇷🇨🇦🇦🇺🇦🇹🇳🇱🇬🇷🇸🇦🇦🇪🇪🇬"]];
@@ -259,6 +260,8 @@ let liveT=null;const live=()=>{clearTimeout(liveT);liveT=setTimeout(()=>{readSet
 $("set").addEventListener("input",live);$("set").addEventListener("change",live);
 window.androidBack=function(){
  const sh=$("shs");if(sh){sh.remove();return true}
+ if($("fwdMod")&&$("fwdMod").style.display=="flex"){if(window.RetroExtras)RetroExtras.closeForward();return true}
+ if($("csearch")&&$("csearch").classList.contains("show")){if(window.RetroExtras)RetroExtras.closeSearch();return true}
  if($("grpInfo")&&$("grpInfo").style.display=="flex"){if(window.RetroGroups)RetroGroups.closeInfo();return true}
  if($("mv")&&$("mv").style.display=="flex"){closeMed();return true}
  if($("mo")&&$("mo").style.display=="flex"){$("moX").click();return true}
@@ -631,6 +634,12 @@ RetroTransport.init({
       renderMsgs();
     }
   },
+  onEditMessage: (fromPin, msgId, newText) => {
+    if (window.RetroExtras) RetroExtras.applyRemoteEdit(fromPin, msgId, newText);
+  },
+  onPinMessage: (fromPin, msgId, preview) => {
+    if (window.RetroExtras) RetroExtras.applyRemotePin(fromPin, msgId, preview);
+  },
   onMediaOpened: (fromPin, msgId) => {
     const f = st.friends.find((x) => x.pin === fromPin);
     if (!f) return;
@@ -800,6 +809,35 @@ if (window.RetroGroups) {
         sel--;
       }
       renderMsgs();
+    },
+  });
+}
+
+if (window.RetroExtras) {
+  RetroExtras.init({
+    getState: () => st,
+    getSelectedFriend: () => st.friends[sel],
+    esc,
+    uid,
+    avH,
+    nowTime: t,
+    toast,
+    save,
+    grow,
+    clearReply: clearRep,
+    renderMsgs,
+    restoreState: (restored) => {
+      st = restored;
+      st.set = Object.assign({ name: "Kullanıcı", status: "on", sound: true, vol: 60, shake: true, int: 100, vib: true, read: true, col: "#00e5ff", stx: "", song: "", mus: false }, st.set || {});
+      RetroTransport.ensureIdentity(st);
+      sel = 0;
+      applySet();
+      fill();
+      drawNp();
+      save();
+      renderList();
+      renderMsgs();
+      if (RetroTransport.isLive()) RetroTransport.connect();
     },
   });
 }

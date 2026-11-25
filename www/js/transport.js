@@ -227,6 +227,26 @@
         case "delete_for_all":
           if (handlers.onDeleteForAll) handlers.onDeleteForAll(data.from, data.msgId);
           break;
+        case "edit_msg": {
+          let newText = data.text;
+          if (data.e2ee && global.RetroCrypto) {
+            try {
+              const st = getStateFn ? getStateFn() : null;
+              const fMatch = st && st.friends ? st.friends.find((x) => x.pin === data.from) : null;
+              const peerPub = data.senderPubKey || (fMatch && fMatch.pubKey) || null;
+              if (st) await global.RetroCrypto.ensureKeyPair(st);
+              const dec = peerPub ? await global.RetroCrypto.decryptPayload(peerPub, data.e2ee) : null;
+              if (dec && typeof dec.t === "string") newText = dec.t;
+            } catch (e) {}
+          }
+          if (handlers.onEditMessage && newText != null) {
+            handlers.onEditMessage(data.from, data.msgId, newText);
+          }
+          break;
+        }
+        case "pin_msg":
+          if (handlers.onPinMessage) handlers.onPinMessage(data.from, data.msgId || "", data.preview || "");
+          break;
         case "media_opened":
           if (handlers.onMediaOpened) handlers.onMediaOpened(data.from, data.msgId);
           break;
@@ -240,6 +260,8 @@
         case "group_typing":
         case "group_reaction":
         case "group_delete":
+        case "group_edit":
+        case "group_pin":
           if (handlers.onGroupEvent) handlers.onGroupEvent(data);
           break;
         case "game_invite":
@@ -454,6 +476,35 @@
     rawSend({ type: "reaction", to: friend.pin, msgId, emoji: emoji || "" });
   }
 
+  async function sendEdit(friend, msgId, text) {
+    if (config.mode !== "ws" || !friend || !msgId) return;
+    if (friend.isGroup) {
+      rawSend({ type: "group_edit", groupId: friend.pin, msgId, text });
+      return;
+    }
+    const st = getStateFn ? getStateFn() : null;
+    if (global.RetroCrypto && friend.pubKey && global.RetroCrypto.validPubJwk(friend.pubKey)) {
+      try {
+        if (st) await global.RetroCrypto.ensureKeyPair(st);
+        const enc = await global.RetroCrypto.encryptPayload(friend.pubKey, { t: text });
+        if (enc) {
+          rawSend({ type: "edit_msg", to: friend.pin, msgId, e2ee: enc });
+          return;
+        }
+      } catch (e) {}
+    }
+    rawSend({ type: "edit_msg", to: friend.pin, msgId, text });
+  }
+
+  function sendPin(friend, msgId, preview) {
+    if (config.mode !== "ws" || !friend) return;
+    if (friend.isGroup) {
+      rawSend({ type: "group_pin", groupId: friend.pin, msgId: msgId || "", preview: preview || "" });
+      return;
+    }
+    rawSend({ type: "pin_msg", to: friend.pin, msgId: msgId || "", preview: preview || "" });
+  }
+
   function sendRaw(obj) {
     return rawSend(obj);
   }
@@ -475,6 +526,8 @@
     sendTyping,
     sendRead,
     deleteForAll,
+    sendEdit,
+    sendPin,
     sendMediaOpened,
     sendReaction,
     sendRaw,
