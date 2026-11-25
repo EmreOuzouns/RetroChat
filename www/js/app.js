@@ -100,13 +100,13 @@ const go=med=>{const m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,med};if(v)vmem[
 if(v){if(RetroTransport.isLive()&&RetroTransport.uploadMedia){toast("Video yükleniyor…");try{const up=await RetroTransport.uploadMedia(fl,fl.name||"video.mp4",fl.type||"video/mp4");go({k:"vid",mode,sec,src:up.url,mediaId:up.id})}catch(err){toast("Video yüklenemedi: "+(err.message||"hata"))}}else{go({k:"vid",mode,sec,src:null})}}else fromImg(fl,d=>{if(mode=="normal")send(d);else go({k:"img",mode,sec,src:d})})};
 
 $("hp").style.cursor="pointer";
-function addFriend(n,p){n=(n||"").trim();p=(p||"").trim().toUpperCase();if(!/^[0-9A-F]{8}$/.test(p))return"PIN 8 haneli olmalı (0-9, A-F).";if(p==st.pin||st.friends.some(f=>f.pin==p))return"Bu PIN zaten ekli.";n=n||"Kişi "+p.slice(-4);st.friends.push({n,s:"on",e:["🧑","👧","👦","🧔","👩‍🎤","🦊"][Math.random()*6|0],pin:p,np:"",h:[],ls:""});save();renderList();return""}
+function addFriend(n,p){if(window.RetroRequests){return RetroRequests.sendRequestByPin(p)}n=(n||"").trim();p=(p||"").trim().toUpperCase();if(!/^[0-9A-F]{8}$/.test(p))return"PIN 8 haneli olmalı (0-9, A-F).";if(p==st.pin||st.friends.some(f=>f.pin==p))return"Bu PIN zaten ekli.";n=n||"Kişi "+p.slice(-4);st.friends.push({n,s:"on",e:["🧑","👧","👦","🧔","👩‍🎤","🦊"][Math.random()*6|0],pin:p,np:"",h:[],ls:""});save();renderList();return""}
 function msg(t2,ok){$("aE").style.color=ok?"#00ff9d":"#ff6b8f";$("aE").textContent=t2}
 const QR=RetroQR.initQR({$,getState:()=>st,addFriend,showToast:toast});
 $("addb").onclick=()=>{QR.tab("P");$("add").style.display="flex"};
 $("aX").onclick=()=>{QR.stopCam();$("add").style.display="none"};
 $("add").onclick=e=>{if(e.target.id=="add"){QR.stopCam();$("add").style.display="none"}};
-$("aOk").onclick=()=>{const e=addFriend("",$("aP").value);if(e)return msg(e,0);$("aP").value="";$("add").style.display="none"};
+$("aOk").onclick=()=>{const e=addFriend("",$("aP").value);if(e)return msg(e,0)};
 
 let pfi=0,pfMe=false;
 function openPF(i){const f=st.friends[i];if(f&&f.isGroup&&window.RetroGroups){RetroGroups.openInfo(f);return}pfMe=false;$("pfVis").style.display="none";$("pfGo").style.display="";$("pfGal").style.display="";$("pfCam").style.display="";$("pfNp").style.display="none";$("pfSp").style.display="none";$("pfSpOff").style.display="none";pfi=i;$("pfa").innerHTML=avH(f)+`<span class="dot ${stc(f)}"></span>`;$("pfa").dataset.st=f.s;$("pfn").textContent=f.n;const ps=$("pfs");ps.textContent=({on:"● Online",busy:"● Meşgul",off:"● Offline"})[f.s]+(f.s=="off"?" · son görülme "+(f.ls||"yakınlarda"):"");ps.style.color=({on:"#00ff9d",busy:"#ff3d71",off:"#99a"})[f.s];$("pfm").textContent=f.np?"🎵 Şu an dinliyor: "+f.np:"";$("pfBio").value=f.bio!=null?f.bio:"Merhaba! RetroChat kullanıyorum.";$("pfp").textContent=f.pin;const secBox=$("pfSec");if(secBox){secBox.style.display="none";if(f.pubKey&&window.RetroCrypto){RetroCrypto.ensureKeyPair(st).then(()=>RetroCrypto.safetyCode(f.pubKey)).then(sc=>{if(sc&&!pfMe&&st.friends[pfi]===f){$("pfSecE").textContent=sc.emojis;$("pfSecC").textContent=sc.code;secBox.style.display=""}}).catch(()=>{})}}$("pf").style.display="flex"}
@@ -211,17 +211,11 @@ document.addEventListener("click",e=>{if(!e.target.closest("#ap"))$("ap").classL
 $("ap").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;$("ap").classList.remove("show");const a=b.dataset.a;if(a=="gal")$("file").click();else if(a=="doc")$("docF").click();else if(a=="aud"&&window.RetroVoice)RetroVoice.startRec();else sendLoc()};
 $("docF").onchange=async e=>{const fl=e.target.files[0];e.target.value="";if(!fl)return;if(fl.size>30*1024*1024)return toast("Dosya en fazla 30 MB olabilir");const f=st.friends[sel];let fileObj={name:fl.name,size:fl.size,type:fl.type};if(RetroTransport.isLive()&&RetroTransport.uploadMedia){toast("Dosya yükleniyor…");try{const up=await RetroTransport.uploadMedia(fl,fl.name,fl.type||"application/octet-stream");fileObj.url=up.url;fileObj.mediaId=up.id}catch(err){return toast("Dosya yüklenemedi: "+(err.message||"hata"))}}const m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,file:fileObj};vmem[m.id]=URL.createObjectURL(fl);f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)};
 function sendLoc(){if(!navigator.geolocation)return toast("Bu cihazda konum desteği yok");toast("Konum alınıyor…");navigator.geolocation.getCurrentPosition(pos=>{const f=st.friends[sel],m={id:uid(),me:1,t:"",at:t(),st:0,r:replyTo,loc:{lat:+pos.coords.latitude.toFixed(5),lon:+pos.coords.longitude.toFixed(5),acc:Math.round(pos.coords.accuracy)}};f.h.push(m);clearRep();save();renderMsgs();RetroTransport.sendMessage(f,m)},()=>toast("Konum alınamadı. Konum izni verdiğinden emin ol"),{enableHighAccuracy:true,timeout:10000})}
-let nbT=0,nbF=null;
-function notify(f,m){if(!m)return;RetroHaptics.notify(st.set.vib);const x=m.k=="n"?"😵‍💫 Titreşim gönderdi":m.aud?"🎤 Sesli mesaj ("+(m.aud.dur||"0:01")+")":m.med?medLabel(m):m.img?"📷 Fotoğraf":m.file?"📄 "+m.file.name:m.loc?"📍 Konum":m.t;nbF=f;$("nba").innerHTML=avH(f);$("nbn").textContent=f.n;$("nbt").textContent=x;const b=$("nb");b.classList.add("show");clearTimeout(nbT);nbT=setTimeout(()=>b.classList.remove("show"),4000)}
+let nbT=0,nbF=null,nbAct=null;
+function notify(f,m){if(!m)return;RetroHaptics.notify(st.set.vib);const x=m.k=="n"?"😵‍💫 Titreşim gönderdi":m.aud?"🎤 Sesli mesaj ("+(m.aud.dur||"0:01")+")":m.med?medLabel(m):m.img?"📷 Fotoğraf":m.file?"📄 "+m.file.name:m.loc?"📍 Konum":m.t;nbF=f;nbAct=null;$("nba").innerHTML=avH(f);$("nbn").textContent=f.n;$("nbt").textContent=x;const b=$("nb");b.classList.add("show");clearTimeout(nbT);nbT=setTimeout(()=>b.classList.remove("show"),4000)}
+function notifyCustom(title,text,onClick){RetroHaptics.notify(st.set.vib);nbF=null;nbAct=onClick||null;$("nba").innerHTML="👋";$("nbn").textContent=title;$("nbt").textContent=text;const b=$("nb");b.classList.add("show");clearTimeout(nbT);nbT=setTimeout(()=>b.classList.remove("show"),5000)}
 let nbMoved=false;
-$("nb").onclick=()=>{if(nbMoved){nbMoved=false;return}$("nb").classList.remove("show");const i=st.friends.indexOf(nbF);if(i>=0)pick(i)};
-const autoMsgs=["Naber? 😊","Akşam boş musun?","Şu şarkıyı dinledin mi? 🎵","Toplantı kaçtaydı?","Günaydın! ☀️","Bir şey soracaktım","😂😂😂","Dosyayı gönderdim mi?","Müsait olunca ara 👋"];
-let autoT=0;
-function fireAuto(){const open=$("app").classList.contains("open");const c=st.friends.filter(f=>f.s!="off"&&!(open&&st.friends[sel]===f));if(!c.length)return false;const f=c[Math.random()*c.length|0],m={id:uid(),me:0,t:autoMsgs[Math.random()*autoMsgs.length|0],at:t()};f.h.push(m);f.u=(f.u||0)+1;save();renderMsgs();notify(f,m);return true}
-function autoLoop(first){clearTimeout(autoT);if(st.set.auto!==true)return;autoT=setTimeout(()=>{fireAuto();autoLoop()},first||rnd(9000,16000))}
-$("sAuto").onchange=()=>{readSet();autoLoop(6000)};
-$("sFire").onclick=()=>{if(!fireAuto())toast("Mesaj gönderebilecek başka online kişi yok")};
-if(st.set.auto===true&&!RetroTransport.isLive())autoLoop(7000);
+$("nb").onclick=()=>{if(nbMoved){nbMoved=false;return}$("nb").classList.remove("show");if(nbAct){const fn=nbAct;nbAct=null;fn();return}const i=st.friends.indexOf(nbF);if(i>=0)pick(i)};
 (function(){const b=$("nb");let y0=null,dy=0;
 b.addEventListener("pointerdown",e=>{y0=e.clientY;dy=0;nbMoved=false;b.style.transition="none";clearTimeout(nbT);try{b.setPointerCapture(e.pointerId)}catch(_){}});
 b.addEventListener("pointermove",e=>{if(y0==null)return;const d=e.clientY-y0;dy=Math.min(0,d);if(Math.abs(d)>6)nbMoved=true;b.style.transform=`translate(-50%,${dy}px)`;b.style.opacity=Math.max(.25,1+dy/140)});
@@ -260,6 +254,7 @@ let liveT=null;const live=()=>{clearTimeout(liveT);liveT=setTimeout(()=>{readSet
 $("set").addEventListener("input",live);$("set").addEventListener("change",live);
 window.androidBack=function(){
  const sh=$("shs");if(sh){sh.remove();return true}
+ if($("permTip")&&$("permTip").style.display=="flex"){if(window.RetroRequests)RetroRequests.closePermTip();return true}
  if($("fwdMod")&&$("fwdMod").style.display=="flex"){if(window.RetroExtras)RetroExtras.closeForward();return true}
  if($("csearch")&&$("csearch").classList.contains("show")){if(window.RetroExtras)RetroExtras.closeSearch();return true}
  if($("grpInfo")&&$("grpInfo").style.display=="flex"){if(window.RetroGroups)RetroGroups.closeInfo();return true}
@@ -312,8 +307,8 @@ $("pfSpOff").onclick=()=>{const c=st.set;c.mus=false;c.song="";delete c.sp;clear
 spHandle(location.href).then(spStart);
 drawNp();
 function applySet(){const c=st.set;document.documentElement.style.setProperty("--cy",c.col);$("myname").textContent=c.name;$("mydot").className="dot "+c.status;$("myav").className="av "+c.status;$("mypin").textContent=st.pin;$("myph").innerHTML=myAv();document.documentElement.style.setProperty("--fs",(c.fs||100)/100);document.body.classList.toggle("nt",!!c.night);applyBg();applyFC()}
-function fill(){const c=st.set;$("sName").value=c.name;$("sStatus").value=c.status;$("sPin").textContent=st.pin;$("sSound").checked=c.sound;$("sNight").checked=!!c.night;$("sVol").value=c.vol;$("sShake").checked=c.shake;$("sInt").value=c.int;$("sVib").checked=c.vib;$("sRead").checked=c.read;$("sAuto").checked=c.auto===true;$("sCol").value=c.col;$("sFs").value=c.fs||100;$("sFsV").textContent=(c.fs||100)+"%";fsSim();$("sPh").innerHTML=myAv();$("sVibNote").textContent=RetroHaptics.describeSupport()}
-function readSet(){const c=st.set;c.name=$("sName").value.trim()||"Ahmet";c.status=$("sStatus").value;c.sound=$("sSound").checked;c.vol=+$("sVol").value;c.shake=$("sShake").checked;c.int=+$("sInt").value;c.vib=$("sVib").checked;c.read=$("sRead").checked;c.timed=$("sTimed").checked;c.auto=$("sAuto").checked;c.col=$("sCol").value;c.fs=+$("sFs").value;applySet();save();renderMsgs()}
+function fill(){const c=st.set;$("sName").value=c.name;$("sStatus").value=c.status;$("sPin").textContent=st.pin;$("sSound").checked=c.sound;$("sNight").checked=!!c.night;$("sVol").value=c.vol;$("sShake").checked=c.shake;$("sInt").value=c.int;$("sVib").checked=c.vib;$("sRead").checked=c.read;$("sCol").value=c.col;$("sFs").value=c.fs||100;$("sFsV").textContent=(c.fs||100)+"%";fsSim();$("sPh").innerHTML=myAv();$("sVibNote").textContent=RetroHaptics.describeSupport()}
+function readSet(){const c=st.set;c.name=$("sName").value.trim()||"Kullanıcı";c.status=$("sStatus").value;c.sound=$("sSound").checked;c.vol=+$("sVol").value;c.shake=$("sShake").checked;c.int=+$("sInt").value;c.vib=$("sVib").checked;c.read=$("sRead").checked;c.timed=$("sTimed").checked;c.col=$("sCol").value;c.fs=+$("sFs").value;applySet();save();renderMsgs()}
 $("gear").onclick=()=>{fill();$("set").classList.add("show");sPage(null)};
 $("sClose").onclick=()=>{readSet();$("set").classList.remove("show")};
 $("set").onclick=e=>{if(e.target.id=="set")$("sClose").onclick()};
@@ -352,7 +347,7 @@ function setFC(hex){st.set.fc=hex||"";applyFC();drawFC();save()}
 $("fcGrid").onclick=e=>{const t=e.target.closest(".fcs");if(!t||t.classList.contains("cus"))return;setFC(t.dataset.c)};
 $("fcGrid").addEventListener("input",e=>{if(e.target.id=="fcCus"){st.set.fc=e.target.value;applyFC();const cur=st.set.fc;const pv=$("fcPrev"),f=fcInfo(cur);pv.style.background="linear-gradient(135deg,"+f.c2+","+f.c1+" 62%,"+f.c3+")";pv.style.color=f.light?"#161a4a":"#fff";$("fcName").textContent="Özel"}});
 $("fcGrid").addEventListener("change",e=>{if(e.target.id=="fcCus"){setFC(e.target.value)}});
-const SG={prof:"Profil",look:"Görünüm",snd:"Bildirimler ve ses",chat:"Sohbetler",dev:"Test araçları"};
+const SG={prof:"Profil",look:"Görünüm",snd:"Bildirimler ve ses",chat:"Sohbetler"};
 function sPage(g){document.querySelectorAll("#sGen .spg").forEach(x=>x.style.display=x.id=="spg-"+g?"":"none");$("sMenu").style.display=g?"none":"";$("sSubHd").style.display=g?"flex":"none";$("sFrTop").style.display=g?"none":"";if(!g)smSync();if(g)$("sSubT").textContent=SG[g];if(g=="look")drawFC();$("sFrMain").scrollTop=0}
 $("set").addEventListener("click",e=>{const r=e.target.closest(".sm");if(r&&r.dataset.g)sPage(r.dataset.g)});
 $("sBack").onclick=()=>sPage(null);
@@ -393,7 +388,6 @@ const bad=c.dir=="miss"||c.dir=="noans",ic=c.t=="video"?CAMI:PHI,lab=(c.t=="vide
 h+=`<div class="c" onclick="pick(${i})"><div class="av ${stc(f)}">${avH(f)}</div><div class="ci"><b class="${bad?"mc":""}">${esc(f.n)}</b><small>${ic}${lab}</small></div><div class="cr"><span class="tm">${d.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}</span></div><button class="cb" onclick="event.stopPropagation();pick(${i});startCall('${c.t}')" aria-label="Ara">${ic}</button></div>`});
 $("clog").innerHTML=h||'<div style="text-align:center;opacity:.6;padding:40px 0">Henüz arama yok</div>'}
 if(!st.calls){st.calls=[];save()}
-if($("sDemo"))$("sDemo").onclick=()=>{const demos=[{n:"Zeynep",s:"on",e:"👩",pin:rp(),np:"Tarkan - Kuzu Kuzu",h:[{id:uid(),me:0,t:"Toplantı kaçtaydı?",at:"15:30",ts:Date.now()}],u:1},{n:"Mehmet",s:"busy",e:"👨",pin:rp(),np:"",h:[{id:uid(),me:0,t:"Günaydın! ☀️",at:"15:30",ts:Date.now()}],u:0},{n:"Ayşe",s:"off",e:"👩‍🦰",pin:rp(),np:"",ls:"bugün 09:41",h:[],u:0}];demos.forEach(d=>st.friends.push(d));save();renderList();renderMsgs();toast("Demo kişiler eklendi")};
 const navB=[...document.querySelectorAll("#nav button")];
 const CHV='<svg class="ch" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function renderPeople(){const q=$("q").value.trim().toLowerCase(),L={on:"Online",busy:"Meşgul",off:"Offline"};const a=st.friends.map((f,i)=>({f,i})).filter(x=>!x.f.isGroup&&(!q||x.f.n.toLowerCase().includes(q)||x.f.pin.toLowerCase().includes(q))).sort((x,y)=>x.f.n.localeCompare(y.f.n,"tr"));
@@ -526,15 +520,14 @@ RetroTransport.init({
   onStatus: (state, label) => {
     const el = $("status");
     if (el) el.textContent = label;
-    if (state === "online") {
-      // Canlı modda sahte test botlarını durdur
-      clearTimeout(autoT);
-    }
   },
-  onAuthOk: (presences, groups) => {
+  onAuthOk: (presences, groups, requests, sentRequests) => {
     presences.forEach(applyRemoteProfile);
     if (window.RetroGroups && Array.isArray(groups)) {
       groups.forEach((g) => RetroGroups.syncGroup(g));
+    }
+    if (window.RetroRequests) {
+      RetroRequests.syncFromAuth(requests, sentRequests);
     }
     save();
     renderList();
@@ -671,6 +664,9 @@ RetroTransport.init({
   },
   onGroupEvent: (ev) => {
     if (window.RetroGroups) RetroGroups.handleEvent(ev);
+  },
+  onRequestEvent: (ev) => {
+    if (window.RetroRequests) RetroRequests.handleEvent(ev);
   },
 });
 
@@ -839,6 +835,30 @@ if (window.RetroExtras) {
       renderList();
       renderMsgs();
       if (RetroTransport.isLive()) RetroTransport.connect();
+    },
+  });
+}
+
+if (window.RetroRequests) {
+  RetroRequests.init({
+    getState: () => st,
+    esc,
+    toast,
+    save,
+    fill,
+    applySet,
+    renderList,
+    setAddMsg: (txt, ok) => msg(txt, ok ? 1 : 0),
+    switchAddTab: (k) => QR.tab(k),
+    notifyBanner: notifyCustom,
+    addAcceptedFriend: (user) => {
+      const f = ensureFriendByPin(user.pin, user);
+      applyRemoteProfile(user);
+      save();
+      renderList();
+      const idx = st.friends.indexOf(f);
+      if (idx >= 0) pick(idx);
+      return f;
     },
   });
 }

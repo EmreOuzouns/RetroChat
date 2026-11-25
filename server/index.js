@@ -20,12 +20,13 @@ fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 // Kalıcı depo: kullanıcı PIN + token + profil + çevrimdışı kuyruk + push + native token + medya indeksi
 let store = {
-  users: {}, // pin -> { token, profile, lastSeen }
+  users: {}, // pin -> { token, profile, pubKey, lastSeen }
   queue: {}, // toPin -> [ { ...event, queuedAt } ]
   pushSubs: {}, // pin -> [ subscription, ... ]
   nativeTokens: {}, // pin -> { token, platform, updatedAt }
   media: {}, // id -> { name, mime, size, owner, createdAt }
   groups: {}, // groupId -> { id, name, icon, owner, members: [], createdAt }
+  requests: {}, // toPin -> [ { id, from, to, createdAt } ]
   vapid: null, // { publicKey, privateKey }
 };
 
@@ -39,6 +40,7 @@ try {
       store.nativeTokens = raw.nativeTokens || {};
       store.media = raw.media || {};
       store.groups = raw.groups || {};
+      store.requests = raw.requests || {};
       store.vapid = raw.vapid || null;
     }
   }
@@ -373,6 +375,52 @@ function listUserGroups(pin) {
   return out;
 }
 
+function maskPin(pin) {
+  const s = String(pin || "");
+  if (s.length < 8) return "••••••••";
+  return s.slice(0, 2) + "••••" + s.slice(-2);
+}
+
+function incomingReqView(req) {
+  const u = store.users[req.from];
+  const p = (u && u.profile) || {};
+  return {
+    id: req.id,
+    fromName: p.name || "Kullanıcı",
+    fromEmo: p.emo || "🧑",
+    fromPhoto: p.photo || null,
+    hint: maskPin(req.from),
+    createdAt: req.createdAt || Date.now(),
+  };
+}
+
+function outgoingReqView(req) {
+  const u = store.users[req.to];
+  const p = (u && u.profile) || {};
+  return {
+    id: req.id,
+    toPin: req.to,
+    toName: p.name || ("Kişi " + req.to.slice(-4)),
+    toEmo: p.emo || "🧑",
+    createdAt: req.createdAt || Date.now(),
+  };
+}
+
+function listIncomingRequests(pin) {
+  return (store.requests[pin] || []).map(incomingReqView);
+}
+
+function listOutgoingRequests(pin) {
+  const out = [];
+  for (const list of Object.values(store.requests)) {
+    if (!Array.isArray(list)) continue;
+    for (const r of list) {
+      if (r && r.from === pin) out.push(outgoingReqView(r));
+    }
+  }
+  return out;
+}
+
 // Yalnızca ilgili PIN'i kişi listesinde barındıran istemcilere presence yayınla (gizlilik & performans)
 function broadcastPresence(pin) {
   const prof = publicProfile(pin);
@@ -689,11 +737,13 @@ wss.on("connection", (ws) => {
       if (!clients.has(pin)) clients.set(pin, new Set());
       clients.get(pin).add(ws);
 
-      // Arkadaş listesinin güncel durumlarını ve üye olunan grupları döndür
+      // Arkadaş listesinin güncel durumlarını, üye olunan grupları ve bekleyen istekleri döndür
       const presences = friendPins.map((fp) => publicProfile(fp)).filter(Boolean);
       const groups = listUserGroups(pin);
+      const requests = listIncomingRequests(pin);
+      const sentRequests = listOutgoingRequests(pin);
 
-      sendJSON(ws, { type: "auth_ok", pin, presences, groups });
+      sendJSON(ws, { type: "auth_ok", pin, presences, groups, requests, sentRequests });
       broadcastPresence(pin);
 
       // Çevrimdışı kuyrukta bekleyen mesaj/olayları teslim et
@@ -753,6 +803,138 @@ wss.on("connection", (ws) => {
         }
         const prof = publicProfile(target);
         sendJSON(ws, { type: "lookup_result", pin: target, user: prof });
+        break;
+      }
+
+      // Karşılıklı PIN Doğrulamalı Arkadaşlık İstekleri
+      case "friend_req_send": {
+        const target = String(data.toPin || "").trim().toUpperCase();
+        if (!/^[0-9A-F]{8}$/.test(target)) {
+          sendJSON(ws, { type: "friend_req_result", ok: false, error: "PIN 8 haneli olmalı (0-9, A-F)." });
+          break;
+        }
+        if (target === from) {
+          sendJSON(ws, { type: "friend_req_result", ok: false, error: "Kendi PIN koduna istek gönderemezsin." });
+          break;
+        }
+        if (!store.users[target]) {
+          sendJSON(ws, {
+            type: "friend_req_result",
+            ok: false,
+            error: "Bu PIN ile kayıtlı bir kullanıcı bulunamadı.",
+          });
+          break;
+        }
+
+        // Eğer karşı taraf zaten bize istek göndermişse ve biz de onun PIN'ini yazdıysak -> otomatik karşılıklı onay!
+        const myInc = store.requests[from] || [];
+        const revIdx = myInc.findIndex((r) => r.from === target);
+        if (revIdx >= 0) {
+          const rev = myInc.splice(revIdx, 1)[0];
+          if (!myInc.length) delete store.requests[from];
+          scheduleSave();
+          rememberPeerRelation(from, target);
+          sendJSON(ws, { type: "friend_req_accepted", reqId: rev.id, user: publicProfile(target), mutual: true });
+          sendToPin(target, { type: "friend_req_accepted", reqId: rev.id, user: publicProfile(from), mutual: true }, true);
+          sendPushToPin(target, {
+            kind: "msg",
+            from,
+            title: "🎉 Arkadaşlık İsteği Onaylandı!",
+            body: `${senderName(from)} PIN kodunu doğruladı ve arkadaş oldunuz!`,
+          });
+          break;
+        }
+
+        if (!store.requests[target]) store.requests[target] = [];
+        let req = store.requests[target].find((r) => r.from === from);
+        if (req) {
+          req.createdAt = Date.now();
+        } else {
+          req = {
+            id: "REQ-" + crypto.randomBytes(4).toString("hex").toUpperCase(),
+            from,
+            to: target,
+            createdAt: Date.now(),
+          };
+          store.requests[target].unshift(req);
+          if (store.requests[target].length > 50) store.requests[target].pop();
+        }
+        scheduleSave();
+
+        sendJSON(ws, { type: "friend_req_result", ok: true, status: "sent", sent: outgoingReqView(req) });
+        sendToPin(target, { type: "friend_req_incoming", req: incomingReqView(req) }, false);
+        sendPushToPin(target, {
+          kind: "friend_req",
+          from: "",
+          title: "👋 Yeni Arkadaşlık İsteği",
+          body: `${senderName(from)} sana arkadaşlık isteği gönderdi! PIN doğrulaması için dokun.`,
+        });
+        break;
+      }
+
+      case "friend_req_accept": {
+        const reqId = String(data.reqId || "");
+        const enteredPin = String(data.pin || "").trim().toUpperCase();
+        const list = store.requests[from] || [];
+        const idx = list.findIndex((r) => r.id === reqId);
+        if (idx < 0) {
+          sendJSON(ws, { type: "friend_req_accept_result", ok: false, reqId, error: "İstek bulunamadı veya iptal edildi." });
+          break;
+        }
+        const req = list[idx];
+        if (enteredPin !== req.from) {
+          sendJSON(ws, {
+            type: "friend_req_accept_result",
+            ok: false,
+            reqId,
+            error: "Girdiğin PIN kodu istek gönderenin PIN koduyla eşleşmedi!",
+          });
+          break;
+        }
+
+        list.splice(idx, 1);
+        if (!list.length) delete store.requests[from];
+        scheduleSave();
+        rememberPeerRelation(from, req.from);
+
+        sendJSON(ws, { type: "friend_req_accepted", reqId: req.id, user: publicProfile(req.from) });
+        sendToPin(req.from, { type: "friend_req_accepted", reqId: req.id, user: publicProfile(from) }, true);
+        sendPushToPin(req.from, {
+          kind: "msg",
+          from,
+          title: "🎉 Arkadaşlık İsteğin Kabul Edildi!",
+          body: `${senderName(from)} PIN kodunu doğruladı, artık mesajlaşabilirsiniz!`,
+        });
+        break;
+      }
+
+      case "friend_req_reject": {
+        const reqId = String(data.reqId || "");
+        const list = store.requests[from] || [];
+        const idx = list.findIndex((r) => r.id === reqId);
+        if (idx >= 0) {
+          const req = list.splice(idx, 1)[0];
+          if (!list.length) delete store.requests[from];
+          scheduleSave();
+          sendJSON(ws, { type: "friend_req_removed", reqId });
+          sendToPin(req.from, { type: "friend_req_rejected", reqId }, true);
+        }
+        break;
+      }
+
+      case "friend_req_cancel": {
+        const reqId = String(data.reqId || "");
+        for (const [toPin, list] of Object.entries(store.requests)) {
+          const idx = Array.isArray(list) ? list.findIndex((r) => r.id === reqId && r.from === from) : -1;
+          if (idx >= 0) {
+            list.splice(idx, 1);
+            if (!list.length) delete store.requests[toPin];
+            scheduleSave();
+            sendJSON(ws, { type: "friend_req_cancelled", reqId });
+            sendToPin(toPin, { type: "friend_req_removed", reqId }, false);
+            break;
+          }
+        }
         break;
       }
 

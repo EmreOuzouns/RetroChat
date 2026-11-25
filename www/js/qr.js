@@ -64,8 +64,7 @@
       if (err) {
         setMsg(err, false);
       } else {
-        setMsg("✓ Kişi eklendi: " + nm, true);
-        if (showToast) showToast("✓ Kişi eklendi: " + nm);
+        setMsg("✓ İstek gönderiliyor: " + nm + " (" + m[1].toUpperCase() + ")", true);
       }
       return true;
     }
@@ -101,7 +100,7 @@
     }
 
     function tab(k) {
-      ["P", "Q", "M", "G"].forEach((x) => {
+      ["P", "Q", "M", "G", "R"].forEach((x) => {
         const vw = $("v" + x);
         if (vw) vw.style.display = x === k ? "block" : "none";
         const btn = $("t" + x);
@@ -119,12 +118,19 @@
       if (k === "G" && global.RetroGroups) {
         global.RetroGroups.renderCreateUI();
       }
+      if (k === "R" && global.RetroRequests) {
+        global.RetroRequests.renderRequestsTab();
+      }
+      if (k === "P" && $("aMyPin")) {
+        $("aMyPin").textContent = getState().pin;
+      }
     }
 
     $("tP").onclick = () => tab("P");
     $("tQ").onclick = () => tab("Q");
     $("tM").onclick = () => tab("M");
     if ($("tG")) $("tG").onclick = () => tab("G");
+    if ($("tR")) $("tR").onclick = () => tab("R");
     $("qx").onclick = closeQR;
     $("qrm").onclick = (e) => {
       if (e.target.id === "qrm") closeQR();

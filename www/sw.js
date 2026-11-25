@@ -1,5 +1,5 @@
 /* RetroChat Service Worker — PWA + Arka Plan Web Push Bildirimleri (Mesaj, Nudge, Arama) */
-const CACHE = "retrochat-v7";
+const CACHE = "retrochat-v8";
 const ASSETS = [
   "/",
   "/index.html",
@@ -16,6 +16,7 @@ const ASSETS = [
   "/js/voice.js",
   "/js/groups.js",
   "/js/extras.js",
+  "/js/requests.js",
   "/js/native.js",
   "/js/app.js",
   "/icons/icon.svg",
@@ -79,7 +80,7 @@ self.addEventListener("push", (e) => {
         body: data.body || "Yeni mesaj",
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
-        tag: isCall ? "rc-call-" + data.from : isNudge ? "rc-nudge-" + data.from : "rc-msg-" + data.from,
+        tag: isCall ? "rc-call-" + data.from : isNudge ? "rc-nudge-" + data.from : data.kind === "friend_req" ? "rc-req" : "rc-msg-" + data.from,
         renotify: true,
         requireInteraction: isCall,
         vibrate: isCall
@@ -107,13 +108,15 @@ self.addEventListener("notificationclick", (e) => {
   if (e.action === "dismiss") return;
 
   const from = (e.notification.data && e.notification.data.from) || "";
-  const targetUrl = from ? "/?chat=" + encodeURIComponent(from) : "/";
+  const kind = (e.notification.data && e.notification.data.kind) || "msg";
+  const isReq = kind === "friend_req";
+  const targetUrl = isReq ? "/?requests=1" : from ? "/?chat=" + encodeURIComponent(from) : "/";
 
   e.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((winList) => {
       for (const w of winList) {
         if (w.url.startsWith(self.location.origin) && "focus" in w) {
-          w.postMessage({ type: "open_chat", from });
+          w.postMessage(isReq ? { type: "open_requests" } : { type: "open_chat", from });
           return w.focus();
         }
       }

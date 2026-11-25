@@ -158,7 +158,7 @@
         case "auth_ok":
           authed = true;
           if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin);
-          if (handlers.onAuthOk) handlers.onAuthOk(data.presences || [], data.groups || []);
+          if (handlers.onAuthOk) handlers.onAuthOk(data.presences || [], data.groups || [], data.requests || [], data.sentRequests || []);
           flushOutbox();
           break;
         case "auth_error":
@@ -252,6 +252,15 @@
           break;
         case "reaction":
           if (handlers.onReaction) handlers.onReaction(data.from, data.msgId, data.emoji || "");
+          break;
+        case "friend_req_result":
+        case "friend_req_incoming":
+        case "friend_req_accept_result":
+        case "friend_req_accepted":
+        case "friend_req_removed":
+        case "friend_req_rejected":
+        case "friend_req_cancelled":
+          if (handlers.onRequestEvent) handlers.onRequestEvent(data);
           break;
         case "group_sync":
         case "group_removed":
