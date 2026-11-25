@@ -327,9 +327,11 @@ drawNp();
 function applySet(){const c=st.set;document.documentElement.style.setProperty("--cy",c.col);$("myname").textContent=c.name;$("mydot").className="dot "+c.status;$("myav").className="av "+c.status;$("mypin").textContent=st.pin;$("myph").innerHTML=myAv();document.documentElement.style.setProperty("--fs",(c.fs||100)/100);document.body.classList.toggle("nt",!!c.night);applyBg();applyFC()}
 function fill(){const c=st.set;$("sName").value=c.name;$("sStatus").value=c.status;$("sPin").textContent=st.pin;$("sSound").checked=c.sound;$("sNight").checked=!!c.night;$("sVol").value=c.vol;$("sShake").checked=c.shake;$("sInt").value=c.int;$("sVib").checked=c.vib;$("sRead").checked=c.read;$("sCol").value=c.col;$("sFs").value=c.fs||100;$("sFsV").textContent=(c.fs||100)+"%";fsSim();$("sPh").innerHTML=myAv();$("sVibNote").textContent=RetroHaptics.describeSupport()}
 function readSet(){const c=st.set;c.name=$("sName").value.trim()||"Kullanıcı";c.status=$("sStatus").value;c.sound=$("sSound").checked;c.vol=+$("sVol").value;c.shake=$("sShake").checked;c.int=+$("sInt").value;c.vib=$("sVib").checked;c.read=$("sRead").checked;c.timed=$("sTimed").checked;c.col=$("sCol").value;c.fs=+$("sFs").value;applySet();save();renderMsgs()}
+function closeSet(){$("set").classList.remove("show");try{readSet()}catch(e){}}
 $("gear").onclick=()=>{fill();$("set").classList.add("show");sPage(null)};
-$("sClose").onclick=()=>{readSet();$("set").classList.remove("show")};
-$("set").onclick=e=>{if(e.target.id=="set")$("sClose").onclick()};
+$("sClose").onclick=e=>{if(e)e.stopPropagation();closeSet()};
+$("sMainHd").onclick=e=>{if(e.target.closest("#sClose")||e.target.tagName==="H2"){e.stopPropagation();closeSet()}};
+$("set").onclick=e=>{if(e.target.id=="set")closeSet()};
 
 $("sTest").onclick=()=>{readSet();shake()};
 $("sClear").onclick=function(){if(this.dataset.a){st.friends.forEach(f=>{f.h=[];f.u=0});save();renderMsgs();this.textContent="Sohbetleri sil";delete this.dataset.a}else{this.dataset.a=1;this.textContent="Emin misin? Tekrar bas"}};
@@ -367,8 +369,9 @@ $("fcGrid").addEventListener("input",e=>{if(e.target.id=="fcCus"){st.set.fc=e.ta
 $("fcGrid").addEventListener("change",e=>{if(e.target.id=="fcCus"){setFC(e.target.value)}});
 const SG={prof:"Profil",look:"Görünüm",snd:"Bildirimler ve ses",chat:"Sohbetler"};
 function sPage(g){document.querySelectorAll("#sGen .spg").forEach(x=>x.style.display=x.id=="spg-"+g?"":"none");$("sMenu").style.display=g?"none":"";$("sSubHd").style.display=g?"flex":"none";$("sFrTop").style.display=g?"none":"";if(!g)smSync();if(g)$("sSubT").textContent=SG[g];if(g=="look")drawFC();$("sFrMain").scrollTop=0}
-$("set").addEventListener("click",e=>{const r=e.target.closest(".sm");if(r&&r.dataset.g)sPage(r.dataset.g)});
-$("sBack").onclick=()=>sPage(null);
+$("set").addEventListener("click",e=>{if(e.target.closest("#sClose")){closeSet();return}if(e.target.closest("#sBack")){sPage(null);return}const r=e.target.closest(".sm");if(r&&r.dataset.g)sPage(r.dataset.g)});
+$("sBack").onclick=e=>{if(e)e.stopPropagation();sPage(null)};
+$("sSubHd").onclick=e=>{if(e.target.closest("#sBack")||e.target.id==="sSubT"){e.stopPropagation();sPage(null)}};
 
 
 /* sürgü: parmakla/fareyle kaydırınca da geçiş yapar */
