@@ -4,7 +4,6 @@
  */
 (function (global) {
   const KDF_TAG = new TextEncoder().encode("RetroChat-E2EE-v1");
-  const SAFETY_EMOJI = ["🔒", "🛡️", "⚡", "🌙", "🔥", "💎", "🚀", "🎯", "🌈", "🎵", "🦊", "🌊", "🍀", "⭐", "🧩", "🔮"];
 
   let myPrivKey = null;
   let myPubJwk = null;
@@ -154,13 +153,7 @@
       const n = ((hash[i] << 8) | hash[i + 1]) % 10000;
       digits.push(String(n).padStart(4, "0"));
     }
-    const emojis = [
-      SAFETY_EMOJI[hash[6] & 15],
-      SAFETY_EMOJI[hash[7] & 15],
-      SAFETY_EMOJI[hash[8] & 15],
-      SAFETY_EMOJI[hash[9] & 15],
-    ].join(" ");
-    return { code: digits.join(" · "), emojis };
+    return { code: digits.join(" · ") };
   }
 
   global.RetroCrypto = {
