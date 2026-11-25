@@ -3,6 +3,24 @@ function uid(){return Math.random().toString(36).slice(2,10)}
 const rp=()=>Array.from({length:8},()=>"0123456789ABCDEF"[Math.random()*16|0]).join("");
 let st={pin:rp(),np:"",friends:[],calls:[]};
 {let x=null,y=null;try{x=JSON.parse(localStorage.getItem("rc")||"null")}catch(e){}try{y=window.__NATIVE_STATE?JSON.parse(window.__NATIVE_STATE):null}catch(e){}if(y&&(!x||(y._t||0)>(x._t||0)))x=y;if(x&&Array.isArray(x.friends))st=x}
+// Eski demo verilerini (Zeynep/Mehmet/Ayşe & varsayılan Ahmet) tek seferlik otomatik temizle (gerçek arkadaşlara dokunmaz)
+if(!st._migratedProd1){
+ const demoPins=new Set();
+ st.friends=(st.friends||[]).filter(f=>{
+  const isDemo=!f.isGroup&&(
+   (f.n==="Zeynep"&&(f.np==="Tarkan - Kuzu Kuzu"||(f.h&&f.h.some(m=>m.t==="Toplantı kaçtaydı?"))))||
+   (f.n==="Mehmet"&&f.h&&f.h.some(m=>m.t==="Günaydın! ☀️"))||
+   (f.n==="Ayşe"&&f.ls==="bugün 09:41"&&(!f.h||f.h.length===0))
+  );
+  if(isDemo)demoPins.add(f.pin);
+  return !isDemo;
+ });
+ if(demoPins.size&&Array.isArray(st.calls)){st.calls=st.calls.filter(c=>!demoPins.has(c.pin))}
+ if(st.set&&(st.set.name==="Ahmet"&&st.set.stx==="Ay dolar gecelerine")){
+  st.set.name="Kullanıcı";st.set.stx="";st.set.song="";st.onboarded=false;
+ }
+ st._migratedProd1=true;
+}
 RetroTransport.ensureIdentity(st);
 let _nT=null,_iT=null;
 function nativeFlush(){clearTimeout(_nT);_nT=null;if(window.ReactNativeWebView){try{window.ReactNativeWebView.postMessage(JSON.stringify({type:"state",data:JSON.stringify(st)}))}catch(e){}}}

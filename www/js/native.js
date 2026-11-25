@@ -57,7 +57,19 @@
   }
 
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    let hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((reg) => {
+      try { reg.update(); } catch (e) {}
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController) { hadController = true; return; }
+      try {
+        if (!sessionStorage.getItem("rc_sw_reloaded")) {
+          sessionStorage.setItem("rc_sw_reloaded", "1");
+          location.reload();
+        }
+      } catch (e) {}
+    });
   }
 
   if (document.readyState === "loading") {

@@ -65,7 +65,7 @@ h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 
 </div>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((r) => { try { r.update(); } catch (e) {} }).catch(() => {});
 }
 
 const ua = navigator.userAgent || "";

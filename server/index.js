@@ -668,7 +668,11 @@ const server = http.createServer((req, res) => {
 
   if (fullPath.startsWith(WWW_DIR) && fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
     const ext = path.extname(fullPath).toLowerCase();
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+    const headers = { "Content-Type": MIME[ext] || "application/octet-stream" };
+    if (ext === ".html" || ext === ".js" || ext === ".css" || ext === ".json") {
+      headers["Cache-Control"] = "no-cache, must-revalidate";
+    }
+    res.writeHead(200, headers);
     return fs.createReadStream(fullPath).pipe(res);
   }
 
