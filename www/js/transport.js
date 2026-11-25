@@ -59,21 +59,25 @@
 
   function probeAlive(timeoutMs) {
     if (config.mode !== "ws") return;
+    // Zaten bağlanıyor (CONNECTING = 0) ise soketi öldürme, bekle!
+    if (ws && ws.readyState === 0) return;
     if (!ws || ws.readyState !== 1 || !authed) {
       retryDelay = 1000;
       connect();
       return;
     }
-    clearTimeout(pongTimer);
+    if (pongTimer) return;
     try {
       ws.send(JSON.stringify({ type: "ping" }));
     } catch (e) {
       connect();
       return;
     }
+    const targetSock = ws;
     pongTimer = setTimeout(() => {
+      pongTimer = null;
+      if (targetSock !== ws) return;
       // Zombie soket tespit edildi — anında yeniden bağlan
-      try { if (ws) ws.close(); } catch (e) {}
       retryDelay = 1000;
       connect();
     }, timeoutMs || 4500);
@@ -167,20 +171,29 @@
 
     config.mode = "ws";
     clearTimeout(reconnectTimer);
+    stopHeartbeat();
+    connected = false;
+    authed = false;
     if (ws) {
-      try { ws.close(); } catch (e) {}
+      const old = ws;
+      ws = null;
+      old.onopen = old.onmessage = old.onclose = old.onerror = null;
+      try { old.close(); } catch (e) {}
     }
 
     if (handlers.onStatus) handlers.onStatus("connecting", "Bağlanıyor…");
 
+    let sock;
     try {
-      ws = new WebSocket(url);
+      sock = new WebSocket(url);
+      ws = sock;
     } catch (e) {
       scheduleReconnect();
       return;
     }
 
-    ws.onopen = async () => {
+    sock.onopen = async () => {
+      if (sock !== ws) return;
       connected = true;
       retryDelay = 1500;
       const st = getStateFn();
@@ -192,8 +205,8 @@
           if (handlers.onIdentityUpdated) handlers.onIdentityUpdated();
         } catch (e) {}
       }
-      if (!ws || ws.readyState !== 1) return;
-      ws.send(
+      if (sock !== ws || sock.readyState !== 1) return;
+      sock.send(
         JSON.stringify({
           type: "auth",
           pin: st.pin,
@@ -205,7 +218,8 @@
       );
     };
 
-    ws.onmessage = async (ev) => {
+    sock.onmessage = async (ev) => {
+      if (sock !== ws) return;
       let data;
       try {
         data = JSON.parse(ev.data);
@@ -362,7 +376,8 @@
       }
     };
 
-    ws.onclose = () => {
+    sock.onclose = () => {
+      if (sock !== ws) return;
       stopHeartbeat();
       connected = false;
       authed = false;
@@ -371,8 +386,9 @@
       scheduleReconnect();
     };
 
-    ws.onerror = () => {
-      try { ws.close(); } catch (e) {}
+    sock.onerror = () => {
+      if (sock !== ws) return;
+      try { sock.close(); } catch (e) {}
     };
   }
 
@@ -388,18 +404,15 @@
     handlers = opts || {};
     getStateFn = opts.getState || null;
     connect();
-    // Wi-Fi <-> 4G/5G geçişinde veya kilitli ekrandan dönünce anında canlı bağlantıyı doğrula
+    // Wi-Fi <-> 4G/5G geçişinde veya kilitli ekrandan dönünce canlı bağlantıyı doğrula
     global.addEventListener("online", () => {
-      if (config.mode === "ws") probeAlive(2500);
+      if (config.mode === "ws") probeAlive(3000);
     });
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && config.mode === "ws") probeAlive(2500);
+      if (!document.hidden && config.mode === "ws") probeAlive(3000);
     });
-    global.addEventListener("focus", () => {
-      if (config.mode === "ws") probeAlive(2500);
-    });
-    global.addEventListener("pageshow", () => {
-      if (config.mode === "ws") probeAlive(2500);
+    global.addEventListener("pageshow", (ev) => {
+      if (ev && ev.persisted && config.mode === "ws") probeAlive(3000);
     });
   }
 
