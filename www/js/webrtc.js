@@ -225,6 +225,7 @@
   }
 
   function updateUI() {
+    if (!ctx) return;
     const scr = $("callScr");
     const mini = $("cbar");
     if (!state) {

@@ -148,7 +148,7 @@
 
   function renderPinBar() {
     const bar = $("pinbar");
-    if (!bar) return;
+    if (!bar || !ctx) return;
     const f = ctx.getSelectedFriend();
     if (!f || !f.pinned || !f.pinned.id) {
       bar.style.display = "none";
@@ -159,6 +159,7 @@
   }
 
   function applyRemotePin(targetPin, msgId, preview) {
+    if (!ctx) return;
     const st = ctx.getState();
     const f = st.friends.find((x) => x.pin === targetPin);
     if (!f) return;
@@ -169,6 +170,7 @@
 
   /* ===== 3. Mesaj Düzenleme ===== */
   function startEdit(msgId) {
+    if (!ctx) return;
     const f = ctx.getSelectedFriend();
     if (!f) return;
     const m = f.h.find((x) => x.id === msgId);
