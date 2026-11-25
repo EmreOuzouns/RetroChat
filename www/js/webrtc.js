@@ -279,8 +279,10 @@
 
     $("cMute").classList.toggle("off", state.muted);
     $("cCam").classList.toggle("off", state.camOff);
+    if ($("cSpk")) $("cSpk").classList.toggle("off", !!state.speaker);
     $("cCam").style.display = isVid ? "" : "none";
     $("cFlip").style.display = isVid ? "" : "none";
+    if ($("cChat")) $("cChat").style.display = isVid ? "none" : "";
     if ($("cFit")) $("cFit").style.display = isVid && state.phase === "active" ? "" : "none";
     $("locVid").style.display = isVid && !state.camOff ? "block" : "none";
     $("remVid").style.display = isVid && state.phase === "active" ? "block" : "none";
@@ -469,6 +471,18 @@
     state.muted = !state.muted;
     localStream.getAudioTracks().forEach((t) => (t.enabled = !state.muted));
     updateUI();
+  }
+
+  function toggleSpeaker() {
+    if (!state) return;
+    state.speaker = !state.speaker;
+    const ra = $("remAud");
+    const rv = $("remVid");
+    const vol = state.speaker ? 1.0 : 0.45;
+    if (ra) ra.volume = vol;
+    if (rv) rv.volume = vol;
+    updateUI();
+    ctx.toast(state.speaker ? "🔊 Hoparlör açık" : "🔈 Normal ses");
   }
 
   function toggleCam() {
@@ -672,6 +686,8 @@
     $("cCam").onclick = toggleCam;
     $("cFlip").onclick = flipCam;
     $("cMin").onclick = minimize;
+    if ($("cSpk")) $("cSpk").onclick = toggleSpeaker;
+    if ($("cChat")) $("cChat").onclick = minimize;
     if ($("cFit")) {
       $("cFit").onclick = () => {
         const rv = $("remVid");
