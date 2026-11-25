@@ -328,6 +328,8 @@ setInterval(() => {
 
 // Aktif WebSocket bağlantıları: pin -> Set<ws>
 const clients = new Map();
+// Titreşim spam koruması: "from:target" -> son gönderim zamanı (10 sn bekleme)
+const nudgeCooldown = new Map();
 
 function sendJSON(ws, payload) {
   if (ws && ws.readyState === 1) {
@@ -1169,8 +1171,12 @@ wss.on("connection", (ws) => {
 
       case "nudge": {
         if (!to) break;
+        const nk = `${from}:${to}`;
+        const now = Date.now();
+        if (now - (nudgeCooldown.get(nk) || 0) < 9500) break;
+        nudgeCooldown.set(nk, now);
         rememberPeerRelation(from, to);
-        sendToPin(to, { type: "nudge", from, at: Date.now() }, true);
+        sendToPin(to, { type: "nudge", from, at: now }, true);
         sendPushToPin(to, {
           kind: "nudge",
           from,
@@ -1388,6 +1394,10 @@ wss.on("connection", (ws) => {
         const gid = String(data.groupId || "").trim().toUpperCase();
         const grp = store.groups[gid];
         if (!grp || !grp.members.includes(from)) break;
+        const nk = `${from}:${gid}`;
+        const now = Date.now();
+        if (now - (nudgeCooldown.get(nk) || 0) < 9500) break;
+        nudgeCooldown.set(nk, now);
         const sName = senderName(from);
         for (const mp of grp.members) {
           if (mp === from) continue;

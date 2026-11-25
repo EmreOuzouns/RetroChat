@@ -294,6 +294,7 @@
     if ($("cChat")) $("cChat").style.display = isVid ? "none" : "";
     if ($("cFit")) $("cFit").style.display = isVid && state.phase === "active" ? "" : "none";
     $("locVid").style.display = isVid && !state.camOff ? "block" : "none";
+    $("locVid").classList.toggle("back", state.facing === "environment");
     $("remVid").style.display = isVid && state.phase === "active" ? "block" : "none";
   }
 
@@ -529,7 +530,10 @@
         localStream.removeTrack(t);
       });
       localStream.addTrack(newTrack);
-      if ($("locVid")) $("locVid").srcObject = localStream;
+      if ($("locVid")) {
+        $("locVid").srcObject = localStream;
+        $("locVid").classList.toggle("back", state.facing === "environment");
+      }
     } catch (e) {
       ctx.toast("Kamera değiştirilemedi");
     }
