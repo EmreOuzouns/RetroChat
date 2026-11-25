@@ -187,14 +187,67 @@ function sendPushToPin(pin, payload) {
   const subs = store.pushSubs[pin];
   if (!subs || !subs.length) return;
   const body = JSON.stringify(payload);
+  const ttl = payload.kind === "call" ? 45 : payload.kind === "call_cancel" ? 60 : 86400;
   subs.forEach((sub) => {
-    webpush.sendNotification(sub, body, { TTL: payload.kind === "call" ? 45 : 86400, urgency: "high" }).catch((err) => {
+    webpush.sendNotification(sub, body, { TTL: ttl, urgency: "high" }).catch((err) => {
       if (err && (err.statusCode === 404 || err.statusCode === 410)) {
         store.pushSubs[pin] = (store.pushSubs[pin] || []).filter((s) => s.endpoint !== sub.endpoint);
         scheduleSave();
+      } else if (err) {
+        console.warn("WebPush send error:", err.statusCode || err.message || err);
       }
     });
   });
+}
+
+// Kilitli/kapalı telefonda gelen aramanın sürekli çalması için tekrarlayan push nabzı
+const activeRingPulses = new Map(); // toPin -> { timer, from, callType }
+
+function stopCallRingPulses(pin, sendCancel) {
+  const rp = activeRingPulses.get(pin);
+  if (rp) {
+    clearInterval(rp.timer);
+    activeRingPulses.delete(pin);
+    if (sendCancel) {
+      sendPushToPin(pin, {
+        kind: "call_cancel",
+        from: rp.from,
+        title: senderName(rp.from),
+        body: "📵 Cevapsız arama",
+      });
+    }
+  }
+}
+
+function clearPendingCall(pin, sendCancel) {
+  pendingCalls.delete(pin);
+  stopCallRingPulses(pin, sendCancel);
+}
+
+function startCallRingPulses(toPin, fromPin, callType) {
+  stopCallRingPulses(toPin, false);
+  const hasPush = !!(store.pushSubs[toPin] && store.pushSubs[toPin].length);
+  const hasNative = !!(store.nativeTokens[toPin] && store.nativeTokens[toPin].length);
+  if (!hasPush && !hasNative) return;
+  const isVid = callType === "video";
+  let pulses = 0;
+  const timer = setInterval(() => {
+    pulses++;
+    if (pulses > 6) {
+      stopCallRingPulses(toPin, true);
+      pendingCalls.delete(toPin);
+      return;
+    }
+    sendPushToPin(toPin, {
+      kind: "call",
+      from: fromPin,
+      callType: isVid ? "video" : "voice",
+      title: senderName(fromPin),
+      body: isVid ? "🎥 Görüntülü arıyor…" : "📞 Sesli arıyor…",
+      pulse: pulses,
+    });
+  }, 5500);
+  activeRingPulses.set(toPin, { timer, from: fromPin, callType: isVid ? "video" : "voice" });
 }
 
 function senderName(pin) {
@@ -268,7 +321,7 @@ setInterval(() => {
     }
   }
   for (const [pin, pc] of pendingCalls.entries()) {
-    if (pc.expiresAt <= now) pendingCalls.delete(pin);
+    if (pc.expiresAt <= now) clearPendingCall(pin, true);
   }
   if (changed) scheduleSave();
 }, 60 * 1000);
@@ -486,6 +539,7 @@ const server = http.createServer((req, res) => {
         groupsCount: Object.keys(store.groups).length,
         mediaCount: Object.keys(store.media).length,
         pushReady: !!(webpush && store.vapid && store.vapid.publicKey),
+        pushSubsCount: Object.values(store.pushSubs).reduce((a, b) => a + (Array.isArray(b) ? b.length : 0), 0),
         nativePushReady: !!(fcmSA || process.env.FCM_SERVER_KEY),
         turnReady: true,
         e2eeReady: true,
@@ -768,7 +822,7 @@ wss.on("connection", (ws) => {
       // Bekleyen gelen arama varsa (bildirimle açıldıysa) hemen ilet
       const pc = pendingCalls.get(pin);
       if (pc && pc.expiresAt > Date.now()) {
-        pendingCalls.delete(pin);
+        clearPendingCall(pin, false);
         if (pc.offer && pc.offer.from) ws.friends.add(pc.offer.from);
         sendJSON(ws, pc.offer);
         for (const ice of pc.ice) sendJSON(ws, ice);
@@ -1322,28 +1376,56 @@ wss.on("connection", (ws) => {
         const ok = sendToPin(to, evPayload, false);
         if (data.type === "call_offer") {
           const isVid = data.callType === "video";
+          const hasPush = !!(store.pushSubs[to] && store.pushSubs[to].length);
+          const hasNative = !!(store.nativeTokens[to] && store.nativeTokens[to].length);
           sendPushToPin(to, {
             kind: "call",
             from,
             callType: isVid ? "video" : "voice",
             title: senderName(from),
             body: isVid ? "🎥 Görüntülü arıyor…" : "📞 Sesli arıyor…",
+            pulse: 0,
           });
           if (!ok) {
-            const hasPush = !!(store.pushSubs[to] && store.pushSubs[to].length);
-            if (hasPush) {
-              pendingCalls.set(to, { offer: evPayload, ice: [], expiresAt: Date.now() + 35000 });
+            if (hasPush || hasNative) {
+              pendingCalls.set(to, { offer: evPayload, ice: [], expiresAt: Date.now() + 45000 });
+              startCallRingPulses(to, from, isVid ? "video" : "voice");
             } else {
               sendJSON(ws, { type: "call_offline", from: to });
             }
+          } else if (hasPush || hasNative) {
+            // Telefon ekranı kilitliyken WS geçici açık kalsa bile bildirim çalmaya devam etsin
+            startCallRingPulses(to, from, isVid ? "video" : "voice");
           }
         } else if (data.type === "call_ice" && !ok && pendingCalls.has(to)) {
           pendingCalls.get(to).ice.push(evPayload);
-        } else if (data.type === "call_end" && pendingCalls.has(to)) {
-          pendingCalls.delete(to);
-        } else if ((data.type === "call_answer" || data.type === "call_reject") && pendingCalls.has(from)) {
-          pendingCalls.delete(from);
+        } else if (data.type === "call_end") {
+          if (pendingCalls.has(to) || activeRingPulses.has(to)) {
+            clearPendingCall(to, true);
+          }
+          stopCallRingPulses(from, false);
+        } else if (data.type === "call_answer" || data.type === "call_reject" || data.type === "call_busy") {
+          clearPendingCall(from, false);
+          stopCallRingPulses(to, false);
         }
+        break;
+      }
+
+      case "push_test": {
+        const subs = store.pushSubs[from] || [];
+        const ntok = store.nativeTokens[from] || [];
+        const count = subs.length + ntok.length;
+        if (count > 0) {
+          setTimeout(() => {
+            sendPushToPin(from, {
+              kind: "msg",
+              from,
+              title: "RetroChat Bildirim Testi 🔔",
+              body: "Harika! Uygulama kapalıyken de mesaj ve aramalar bu şekilde gelecek.",
+            });
+          }, 2500);
+        }
+        sendJSON(ws, { type: "push_test_result", ok: count > 0, count });
         break;
       }
 

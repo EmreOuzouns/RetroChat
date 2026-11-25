@@ -28,6 +28,9 @@
   let pendingIce = [];
   let iceRestarting = false;
   let ringTimer = null;
+  let incVibTimer = null;
+  let autoAnswerPin = null;
+  let autoAnswerUntil = 0;
   let state = null; // { pin, friend, type, dir, phase, reconnecting, start, timer, muted, camOff, facing, minimized }
 
   function $(id) {
@@ -207,6 +210,8 @@
     if (!state) return;
     clearTimeout(ringTimer);
     ringTimer = null;
+    clearInterval(incVibTimer);
+    incVibTimer = null;
     if (state.phase !== "active") {
       ctx.ringStop();
       state.phase = "active";
@@ -349,6 +354,8 @@
   async function accept() {
     if (!state || state.dir !== "in" || !pendingOffer) return;
     ctx.ringStop();
+    clearInterval(incVibTimer);
+    incVibTimer = null;
 
     try {
       localStream = await getMedia(state.type, "user");
@@ -411,6 +418,8 @@
     ctx.ringStop();
     clearTimeout(ringTimer);
     ringTimer = null;
+    clearInterval(incVibTimer);
+    incVibTimer = null;
     if (state) {
       clearInterval(state.timer);
       const dur = state.phase === "active" && state.start ? Date.now() - state.start : 0;
@@ -536,9 +545,23 @@
         pendingIce = [];
 
         const st = ctx.getState();
-        if (st.set.sound) ctx.ringPlay(ty === "video" ? st.set.ringG : st.set.ringV, 12);
+        if (st.set.sound) ctx.ringPlay(ty === "video" ? st.set.ringG : st.set.ringV, 16);
         if (global.RetroHaptics) global.RetroHaptics.nudge(st.set.vib);
+        clearInterval(incVibTimer);
+        incVibTimer = setInterval(() => {
+          if (!state || state.phase !== "ringing" || state.dir !== "in") {
+            clearInterval(incVibTimer);
+            incVibTimer = null;
+            return;
+          }
+          if (global.RetroHaptics) global.RetroHaptics.nudge(ctx.getState().set.vib);
+        }, 3800);
         updateUI();
+        if (autoAnswerPin === fromPin && Date.now() < autoAnswerUntil) {
+          autoAnswerPin = null;
+          autoAnswerUntil = 0;
+          setTimeout(() => accept(), 250);
+        }
         break;
       }
 
@@ -656,6 +679,20 @@
     loadIceServers();
   }
 
+  function prepareIncoming(fromPin, autoAns) {
+    if (!fromPin) return;
+    const pin = String(fromPin).trim().toUpperCase();
+    if (state && state.pin === pin && state.dir === "in" && state.phase === "ringing") {
+      maximize();
+      if (autoAns) accept();
+      return;
+    }
+    if (autoAns) {
+      autoAnswerPin = pin;
+      autoAnswerUntil = Date.now() + 15000;
+    }
+  }
+
   function isActive() {
     return !!state;
   }
@@ -673,6 +710,7 @@
     hangup,
     minimize,
     maximize,
+    prepareIncoming,
     syncBar: updateUI,
     getCallInfo,
     handleEvent,

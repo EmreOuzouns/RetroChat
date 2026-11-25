@@ -1,5 +1,5 @@
 /* RetroChat Service Worker — PWA + Arka Plan Web Push Bildirimleri (Mesaj, Nudge, Arama) */
-const CACHE = "retrochat-v13";
+const CACHE = "retrochat-v14";
 const ASSETS = [
   "/",
   "/index.html",
@@ -69,9 +69,28 @@ self.addEventListener("push", (e) => {
 
   e.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((winList) => {
+      // Arama iptal edildiyse veya cevapsız kaldıysa çalan bildirimi kapat, cevapsız arama göster
+      if (data.kind === "call_cancel") {
+        return self.registration.getNotifications({ tag: "rc-call-" + data.from }).then((list) => {
+          list.forEach((n) => n.close());
+          const focused = winList.some((w) => w.focused && w.visibilityState === "visible");
+          if (focused) return;
+          return self.registration.showNotification(data.title || "RetroChat", {
+            body: data.body || "📵 Cevapsız arama",
+            icon: "/icons/icon-192.png",
+            badge: "/icons/icon-192.png",
+            tag: "rc-miss-" + data.from,
+            renotify: true,
+            requireInteraction: false,
+            vibrate: [140, 80, 140],
+            data: { from: data.from || "", kind: "msg" },
+          });
+        });
+      }
+
       // Uygulama şu an kullanıcı tarafından aktif/odaklı görüntüleniyorsa push spam'i yapma
       const focused = winList.some((w) => w.focused && w.visibilityState === "visible");
-      if (focused && data.kind !== "call") return;
+      if (focused && (data.kind !== "call" || (data.pulse && data.pulse > 0))) return;
 
       const isCall = data.kind === "call";
       const isNudge = data.kind === "nudge";
@@ -83,18 +102,19 @@ self.addEventListener("push", (e) => {
         tag: isCall ? "rc-call-" + data.from : isNudge ? "rc-nudge-" + data.from : data.kind === "friend_req" ? "rc-req" : "rc-msg-" + data.from,
         renotify: true,
         requireInteraction: isCall,
+        silent: false,
         vibrate: isCall
-          ? [500, 200, 500, 200, 500, 200, 500]
+          ? [600, 250, 600, 250, 600, 250, 600]
           : isNudge
           ? [300, 100, 300, 100, 300, 100, 500]
-          : [160, 80, 160],
-        data: { from: data.from || "", kind: data.kind || "msg" },
+          : [180, 80, 180],
+        data: { from: data.from || "", kind: data.kind || "msg", callType: data.callType || "voice" },
       };
 
       if (isCall) {
         opts.actions = [
-          { action: "open", title: "📞 Aç / Cevapla" },
-          { action: "dismiss", title: "Kapat" },
+          { action: "answer", title: "📞 Cevapla" },
+          { action: "dismiss", title: "Reddet" },
         ];
       }
 
@@ -110,13 +130,27 @@ self.addEventListener("notificationclick", (e) => {
   const from = (e.notification.data && e.notification.data.from) || "";
   const kind = (e.notification.data && e.notification.data.kind) || "msg";
   const isReq = kind === "friend_req";
-  const targetUrl = isReq ? "/?requests=1" : from ? "/?chat=" + encodeURIComponent(from) : "/";
+  const isCall = kind === "call";
+  const autoAns = isCall && e.action === "answer";
+  const targetUrl = isReq
+    ? "/?requests=1"
+    : isCall && from
+    ? "/?call=" + encodeURIComponent(from) + "&auto=" + (autoAns ? "1" : "0")
+    : from
+    ? "/?chat=" + encodeURIComponent(from)
+    : "/";
 
   e.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((winList) => {
       for (const w of winList) {
         if (w.url.startsWith(self.location.origin) && "focus" in w) {
-          w.postMessage(isReq ? { type: "open_requests" } : { type: "open_chat", from });
+          w.postMessage(
+            isReq
+              ? { type: "open_requests" }
+              : isCall
+              ? { type: "open_call", from, auto: autoAns }
+              : { type: "open_chat", from }
+          );
           return w.focus();
         }
       }
