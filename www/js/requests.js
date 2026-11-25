@@ -219,10 +219,10 @@
       return "Bu kişi zaten arkadaş listende ekli.";
     }
     if (!global.RetroTransport || !global.RetroTransport.isLive()) {
-      return "İstek göndermek için sunucu bağlantısı bekleniyor…";
+      return "Kişi eklemek için sunucu bağlantısı bekleniyor…";
     }
-    global.RetroTransport.sendRaw({ type: "friend_req_send", toPin: pin });
-    ctx.setAddMsg("İstek gönderiliyor…", true);
+    global.RetroTransport.sendRaw({ type: "add_friend_pin", pin });
+    ctx.setAddMsg("Kişi ekleniyor…", true);
     return "";
   }
 
@@ -241,6 +241,32 @@
 
   function handleEvent(ev) {
     switch (ev.type) {
+      case "add_friend_result": {
+        if (!ev.ok) {
+          ctx.setAddMsg(ev.error || "Kişi eklenemedi", false);
+          return;
+        }
+        if ($("aP")) $("aP").value = "";
+        if (ev.user && ev.user.pin) {
+          const f = ctx.addAcceptedFriend(ev.user);
+          $("add").style.display = "none";
+          ctx.toast(`🎉 ${f.n} eklendi! Hemen mesajlaşabilirsiniz.`);
+        }
+        break;
+      }
+
+      case "friend_linked": {
+        if (ev.user && ev.user.pin && ctx.addLinkedFriend) {
+          const added = ctx.addLinkedFriend(ev.user);
+          if (added) {
+            ctx.notifyBanner("👋 " + added.n, "Seni arkadaş olarak ekledi · sohbeti açmak için dokun", () => {
+              ctx.addAcceptedFriend(ev.user);
+            });
+          }
+        }
+        break;
+      }
+
       case "friend_req_result": {
         if (!ev.ok) {
           ctx.setAddMsg(ev.error || "İstek gönderilemedi", false);

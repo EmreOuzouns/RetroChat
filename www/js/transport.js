@@ -26,9 +26,47 @@
   let connected = false;
   let authed = false;
   let reconnectTimer = null;
+  let pingTimer = null;
+  let pongTimer = null;
   let retryDelay = 1500;
   let outbox = [];
   let getStateFn = null;
+
+  function stopHeartbeat() {
+    clearInterval(pingTimer);
+    clearTimeout(pongTimer);
+    pingTimer = null;
+    pongTimer = null;
+  }
+
+  function probeAlive(timeoutMs) {
+    if (config.mode !== "ws") return;
+    if (!ws || ws.readyState !== 1 || !authed) {
+      retryDelay = 1000;
+      connect();
+      return;
+    }
+    clearTimeout(pongTimer);
+    try {
+      ws.send(JSON.stringify({ type: "ping" }));
+    } catch (e) {
+      connect();
+      return;
+    }
+    pongTimer = setTimeout(() => {
+      // Zombie soket tespit edildi — anında yeniden bağlan
+      try { if (ws) ws.close(); } catch (e) {}
+      retryDelay = 1000;
+      connect();
+    }, timeoutMs || 4500);
+  }
+
+  function startHeartbeat() {
+    stopHeartbeat();
+    pingTimer = setInterval(() => {
+      if (!document.hidden) probeAlive(5000);
+    }, 15000);
+  }
 
   function resolveServerUrl(state) {
     const custom = (state && state.set && state.set.serverUrl) || global.RETROCHAT_SERVER_URL || config.serverUrl;
@@ -157,9 +195,14 @@
       switch (data.type) {
         case "auth_ok":
           authed = true;
+          startHeartbeat();
           if (handlers.onStatus) handlers.onStatus("online", "Bağlı · PIN " + data.pin);
           if (handlers.onAuthOk) handlers.onAuthOk(data.presences || [], data.groups || [], data.requests || [], data.sentRequests || []);
           flushOutbox();
+          break;
+        case "pong":
+          clearTimeout(pongTimer);
+          pongTimer = null;
           break;
         case "auth_error":
           if (data.code === "PIN_TAKEN" && handlers.onPinTaken) {
@@ -209,7 +252,7 @@
               };
             }
           }
-          if (handlers.onMessage) handlers.onMessage(data.from, incoming, peerPub);
+          if (handlers.onMessage) handlers.onMessage(data.from, incoming, peerPub, data.senderProfile || null);
           break;
         }
         case "nudge":
@@ -253,6 +296,8 @@
         case "reaction":
           if (handlers.onReaction) handlers.onReaction(data.from, data.msgId, data.emoji || "");
           break;
+        case "add_friend_result":
+        case "friend_linked":
         case "friend_req_result":
         case "friend_req_incoming":
         case "friend_req_accept_result":
@@ -295,6 +340,7 @@
     };
 
     ws.onclose = () => {
+      stopHeartbeat();
       connected = false;
       authed = false;
       if (handlers.onStatus) handlers.onStatus("offline", "Yeniden bağlanıyor…");
@@ -318,12 +364,18 @@
     handlers = opts || {};
     getStateFn = opts.getState || null;
     connect();
-    // Wi-Fi <-> 4G/5G geçişinde beklemeden anında yeniden bağlan
+    // Wi-Fi <-> 4G/5G geçişinde veya kilitli ekrandan dönünce anında canlı bağlantıyı doğrula
     global.addEventListener("online", () => {
-      if (config.mode === "ws" && (!ws || ws.readyState !== 1)) {
-        retryDelay = 1500;
-        connect();
-      }
+      if (config.mode === "ws") probeAlive(2500);
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && config.mode === "ws") probeAlive(2500);
+    });
+    global.addEventListener("focus", () => {
+      if (config.mode === "ws") probeAlive(2500);
+    });
+    global.addEventListener("pageshow", () => {
+      if (config.mode === "ws") probeAlive(2500);
     });
   }
 

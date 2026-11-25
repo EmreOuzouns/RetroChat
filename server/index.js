@@ -795,6 +795,9 @@ wss.on("connection", (ws) => {
       if (!clients.has(pin)) clients.set(pin, new Set());
       clients.get(pin).add(ws);
 
+      // Arkadaş listesindeki çevrimiçi kişilerle karşılıklı presence aboneliği kur
+      for (const fp of friendPins) rememberPeerRelation(pin, fp);
+
       // Arkadaş listesinin güncel durumlarını, üye olunan grupları ve bekleyen istekleri döndür
       const presences = friendPins.map((fp) => publicProfile(fp)).filter(Boolean);
       const groups = listUserGroups(pin);
@@ -858,9 +861,43 @@ wss.on("connection", (ws) => {
         const target = String(data.pin || "").trim().toUpperCase();
         if (/^[0-9A-F]{8}$/.test(target)) {
           ws.friends.add(target);
+          rememberPeerRelation(from, target);
         }
         const prof = publicProfile(target);
         sendJSON(ws, { type: "lookup_result", pin: target, user: prof });
+        break;
+      }
+
+      // Tek Taraflı Anında PIN ile Kişi Ekleme (sadece ekleyen kişinin PIN yazması yeterli)
+      case "add_friend_pin": {
+        const target = String(data.pin || "").trim().toUpperCase();
+        if (!/^[0-9A-F]{8}$/.test(target)) {
+          sendJSON(ws, { type: "add_friend_result", ok: false, error: "PIN 8 haneli olmalı (0-9, A-F)." });
+          break;
+        }
+        if (target === from) {
+          sendJSON(ws, { type: "add_friend_result", ok: false, error: "Kendi PIN kodunu ekleyemezsin." });
+          break;
+        }
+        if (!store.users[target]) {
+          sendJSON(ws, {
+            type: "add_friend_result",
+            ok: false,
+            error: "Bu PIN ile kayıtlı kullanıcı bulunamadı. Arkadaşının uygulamayı açıp güncel PIN kodunu paylaştığından emin ol.",
+          });
+          break;
+        }
+        rememberPeerRelation(from, target);
+        const targetProf = publicProfile(target);
+        const myProf = publicProfile(from);
+        sendJSON(ws, { type: "add_friend_result", ok: true, user: targetProf });
+        sendToPin(target, { type: "friend_linked", user: myProf }, true);
+        sendPushToPin(target, {
+          kind: "msg",
+          from,
+          title: "👋 " + senderName(from),
+          body: "Seni RetroChat'e ekledi! Hemen mesajlaşmaya başlayabilirsin.",
+        });
         break;
       }
 
@@ -1020,9 +1057,10 @@ wss.on("connection", (ws) => {
         if (!to || !data.msg) break;
         rememberPeerRelation(from, to);
         const senderPubKey = (store.users[from] && store.users[from].pubKey) || null;
+        const senderProfile = publicProfile(from);
         const delivered = sendToPin(
           to,
-          { type: "msg", from, msg: data.msg, senderPubKey, timed: !!data.timed },
+          { type: "msg", from, msg: data.msg, senderPubKey, senderProfile, timed: !!data.timed },
           true
         );
         if (delivered && data.msg.id) {

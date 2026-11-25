@@ -543,7 +543,14 @@ RetroTransport.init({
     if (el) el.textContent = label;
   },
   onAuthOk: (presences, groups, requests, sentRequests) => {
-    presences.forEach(applyRemoteProfile);
+    const seen = new Set();
+    presences.forEach((u) => {
+      if (u && u.pin) seen.add(u.pin);
+      applyRemoteProfile(u);
+    });
+    st.friends.forEach((f) => {
+      if (!f.isGroup && !seen.has(f.pin)) f.s = "off";
+    });
     if (window.RetroGroups && Array.isArray(groups)) {
       groups.forEach((g) => RetroGroups.syncGroup(g));
     }
@@ -576,8 +583,9 @@ RetroTransport.init({
       if (st.friends[sel] && st.friends[sel].pin === pin) renderMsgs();
     }
   },
-  onMessage: (fromPin, msg, senderPubKey) => {
-    const f = ensureFriendByPin(fromPin);
+  onMessage: (fromPin, msg, senderPubKey, senderProfile) => {
+    const f = ensureFriendByPin(fromPin, senderProfile || undefined);
+    if (senderProfile) applyRemoteProfile(senderProfile);
     if (senderPubKey) f.pubKey = senderPubKey;
     const incoming = Object.assign({}, msg, { me: 0, at: msg.at || t(), ts: Date.now() });
     f.h.push(incoming);
@@ -880,6 +888,14 @@ if (window.RetroRequests) {
       const idx = st.friends.indexOf(f);
       if (idx >= 0) pick(idx);
       return f;
+    },
+    addLinkedFriend: (user) => {
+      const existed = st.friends.some((x) => !x.isGroup && x.pin === user.pin);
+      const f = ensureFriendByPin(user.pin, user);
+      applyRemoteProfile(user);
+      save();
+      renderList();
+      return existed ? null : f;
     },
   });
 }

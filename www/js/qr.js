@@ -64,7 +64,7 @@
       if (err) {
         setMsg(err, false);
       } else {
-        setMsg("✓ İstek gönderiliyor: " + nm + " (" + m[1].toUpperCase() + ")", true);
+        setMsg("✓ Ekleniyor: " + nm + " (" + m[1].toUpperCase() + ")", true);
       }
       return true;
     }
