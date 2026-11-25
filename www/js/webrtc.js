@@ -228,7 +228,10 @@
     const scr = $("callScr");
     const mini = $("cbar");
     if (!state) {
-      if (scr) scr.classList.remove("show", "video", "voice", "incoming", "active");
+      if (scr) {
+        scr.classList.remove("show", "video", "voice", "incoming", "active");
+        scr.style.display = "none";
+      }
       if (mini) mini.style.display = "none";
       return;
     }
@@ -238,22 +241,27 @@
     const dur = state.phase === "active" ? fmtT(Date.now() - state.start) : "";
 
     if (mini) {
-      mini.style.display = "flex";
-      mini.className = state.type;
-      const statusTxt = state.reconnecting
-        ? `${f.n} · Yeniden bağlanıyor…`
-        : state.phase === "active"
-        ? `${f.n} ile ${isVid ? "görüntülü" : "sesli"} görüşme · ${dur}`
-        : state.phase === "connecting"
-        ? `${f.n} · Bağlanıyor…`
-        : state.dir === "in"
-        ? `${f.n} arıyor…`
-        : `${f.n} aranıyor…`;
-      mini.innerHTML = `<span style="cursor:pointer" onclick="RetroCalls.maximize()">${isVid ? "🎥" : "📞"} ${ctx.esc(statusTxt)}</span><button onclick="RetroCalls.hangup()">Bitir</button>`;
+      if (state.minimized) {
+        mini.style.display = "flex";
+        mini.className = state.type;
+        const statusTxt = state.reconnecting
+          ? `${f.n} · Yeniden bağlanıyor…`
+          : state.phase === "active"
+          ? `${f.n} ile ${isVid ? "görüntülü" : "sesli"} görüşme · ${dur}`
+          : state.phase === "connecting"
+          ? `${f.n} · Bağlanıyor…`
+          : state.dir === "in"
+          ? `${f.n} arıyor…`
+          : `${f.n} aranıyor…`;
+        mini.innerHTML = `<span style="cursor:pointer" onclick="RetroCalls.maximize()">${isVid ? "🎥" : "📞"} ${ctx.esc(statusTxt)}</span><button onclick="RetroCalls.hangup()">Bitir</button>`;
+      } else {
+        mini.style.display = "none";
+      }
     }
 
     if (!scr) return;
     scr.classList.toggle("show", !state.minimized);
+    scr.style.display = state.minimized ? "none" : "flex";
     scr.classList.toggle("video", isVid);
     scr.classList.toggle("voice", !isVid);
     scr.classList.toggle("incoming", state.dir === "in" && state.phase === "ringing");

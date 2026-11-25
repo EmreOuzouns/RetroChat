@@ -261,6 +261,25 @@
     }).catch(() => {});
   }
 
+  // Beklenmeyen istemci hatalarını sunucuya bildir (hızlı teşhis için)
+  function reportClientErr(msg) {
+    try {
+      if (!/^https?:$/.test(location.protocol)) return;
+      const v = getRunningVersion() || "unknown";
+      fetch("/client-err", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ v, msg: String(msg || "").slice(0, 300), ua: (navigator.userAgent || "").slice(0, 120) }),
+      }).catch(() => {});
+    } catch (e) {}
+  }
+  global.addEventListener("error", (e) => {
+    reportClientErr((e && e.message) + " @" + (e && e.filename) + ":" + (e && e.lineno));
+  });
+  global.addEventListener("unhandledrejection", (e) => {
+    reportClientErr("REJ: " + (e && e.reason && (e.reason.stack || e.reason.message || e.reason)));
+  });
+
   global.RetroUpdater = { check: checkUpdate, applyUpdate };
 
   if (document.readyState === "loading") {

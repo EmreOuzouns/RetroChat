@@ -599,6 +599,17 @@ const server = http.createServer((req, res) => {
     );
   }
 
+  if (urlPath === "/client-err" && req.method === "POST") {
+    let raw = "";
+    req.on("data", (c) => { if (raw.length < 2048) raw += c; });
+    req.on("end", () => {
+      console.warn("[CLIENT_ERR]", raw.slice(0, 500));
+      res.writeHead(204);
+      res.end();
+    });
+    return;
+  }
+
   if (urlPath === "/version") {
     const meta = getAppVersionMeta();
     res.writeHead(200, {
