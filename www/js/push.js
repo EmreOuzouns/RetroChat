@@ -202,11 +202,11 @@
     } catch (e) {}
   }
 
-  function handleCallLaunch(fromPin, autoAns) {
+  function handleCallLaunch(fromPin, autoAns, autoRej) {
     if (!fromPin) return;
-    if (ctx && ctx.openByPin) ctx.openByPin(fromPin);
+    if (!autoRej && ctx && ctx.openByPin) ctx.openByPin(fromPin);
     if (global.RetroCalls && global.RetroCalls.prepareIncoming) {
-      global.RetroCalls.prepareIncoming(fromPin, !!autoAns);
+      global.RetroCalls.prepareIncoming(fromPin, !!autoAns, !!autoRej);
     }
   }
 
@@ -229,7 +229,9 @@
         if (ev.data.type === "open_chat" && ev.data.from && ctx && ctx.openByPin) {
           ctx.openByPin(ev.data.from);
         } else if (ev.data.type === "open_call" && ev.data.from) {
-          handleCallLaunch(ev.data.from, !!ev.data.auto);
+          handleCallLaunch(ev.data.from, !!ev.data.auto, false);
+        } else if (ev.data.type === "reject_call" && ev.data.from) {
+          handleCallLaunch(ev.data.from, false, true);
         }
       });
     }
@@ -238,9 +240,10 @@
       const sp = new URLSearchParams(location.search);
       const callPin = sp.get("call");
       const autoAns = sp.get("auto") === "1";
+      const autoRej = sp.get("reject") === "1";
       const chatPin = sp.get("chat");
       if (callPin) {
-        setTimeout(() => handleCallLaunch(callPin, autoAns), 300);
+        setTimeout(() => handleCallLaunch(callPin, autoAns, autoRej), 300);
         history.replaceState(null, "", location.pathname);
       } else if (chatPin && ctx && ctx.openByPin) {
         setTimeout(() => ctx.openByPin(chatPin), 400);

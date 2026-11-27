@@ -1,5 +1,5 @@
 /* RetroChat Service Worker — PWA + Arka Plan Web Push Bildirimleri (Mesaj, Nudge, Arama) */
-const CACHE = "retrochat-v30";
+const CACHE = "retrochat-v31";
 const ASSETS = [
   "/",
   "/index.html",
@@ -131,15 +131,19 @@ self.addEventListener("push", (e) => {
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  if (e.action === "dismiss") return;
 
   const from = (e.notification.data && e.notification.data.from) || "";
   const kind = (e.notification.data && e.notification.data.kind) || "msg";
   const isReq = kind === "friend_req";
   const isCall = kind === "call";
+  const isReject = isCall && e.action === "dismiss";
+  if (e.action === "dismiss" && !isCall) return;
+
   const autoAns = isCall && e.action === "answer";
   const targetUrl = isReq
     ? "/?requests=1"
+    : isReject && from
+    ? "/?call=" + encodeURIComponent(from) + "&reject=1"
     : isCall && from
     ? "/?call=" + encodeURIComponent(from) + "&auto=" + (autoAns ? "1" : "0")
     : from
@@ -153,11 +157,13 @@ self.addEventListener("notificationclick", (e) => {
           w.postMessage(
             isReq
               ? { type: "open_requests" }
+              : isReject
+              ? { type: "reject_call", from }
               : isCall
               ? { type: "open_call", from, auto: autoAns }
               : { type: "open_chat", from }
           );
-          return w.focus();
+          return isReject ? undefined : w.focus();
         }
       }
       if (clients.openWindow) return clients.openWindow(targetUrl);

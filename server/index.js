@@ -1510,7 +1510,9 @@ wss.on("connection", (ws) => {
       case "call_busy": {
         if (!to) break;
         rememberPeerRelation(from, to);
-        const evPayload = { ...data, from };
+        const evPayload = data.type === "call_offer"
+          ? { ...data, from, callerProfile: publicProfile(from) }
+          : { ...data, from };
         const ok = sendToPin(to, evPayload, false);
         if (data.type === "call_offer") {
           console.log(`[WS] CALL_OFFER ${from}->${to} type=${data.callType} online=${ok}`);

@@ -49,7 +49,9 @@
   let incVibTimer = null;
   let autoAnswerPin = null;
   let autoAnswerUntil = 0;
-  let state = null; // { pin, friend, type, dir, phase, reconnecting, start, timer, muted, camOff, speaker, facing, minimized }
+  let autoRejectPin = null;
+  let autoRejectUntil = 0;
+  let state = null; // { pin, friend, type, dir, phase, reconnecting, start, timer, muted, camOff, speaker, ringSilenced, facing, minimized }
 
   function $(id) {
     return document.getElementById(id);
@@ -600,8 +602,21 @@
       : "Sesli aranıyor…";
 
     $("cMute").classList.toggle("off", state.muted);
+    const muteLbl = $("cMute") && $("cMute").querySelector("span");
+    if (muteLbl) muteLbl.textContent = state.muted ? "Sessizde" : "Mikrofon";
     $("cCam").classList.toggle("off", state.camOff);
-    if ($("cSpk")) $("cSpk").classList.toggle("off", state.speaker !== false);
+    const camLbl = $("cCam") && $("cCam").querySelector("span");
+    if (camLbl) camLbl.textContent = state.camOff ? "Kamera Kapalı" : "Kamera";
+    if ($("cSpk")) {
+      $("cSpk").classList.toggle("off", state.speaker !== false);
+      const spkLbl = $("cSpk").querySelector("span");
+      if (spkLbl) spkLbl.textContent = state.speaker !== false ? "Hoparlör" : "Normal";
+    }
+    if ($("cSil")) {
+      $("cSil").classList.toggle("off", !!state.ringSilenced);
+      const silLbl = $("cSil").querySelector("span");
+      if (silLbl) silLbl.textContent = state.ringSilenced ? "Sessizde" : "Sessize Al";
+    }
     $("cCam").style.display = isVid ? "" : "none";
     $("cFlip").style.display = isVid ? "" : "none";
     if ($("cChat")) $("cChat").style.display = isVid ? "none" : "";
@@ -837,10 +852,27 @@
     if (reasonMsg) ctx.toast(reasonMsg);
   }
 
+  function silenceRing() {
+    if (!state || state.dir !== "in" || state.phase !== "ringing") return false;
+    const already = !!state.ringSilenced;
+    state.ringSilenced = true;
+    ctx.ringStop(false);
+    clearInterval(incVibTimer);
+    incVibTimer = null;
+    try {
+      if (navigator.vibrate) navigator.vibrate(0);
+    } catch (e) {}
+    updateUI();
+    if (!already) ctx.toast("🔕 Zil sesi kapatıldı");
+    return true;
+  }
+
   function toggleMute() {
-    if (!state || !localStream) return;
+    if (!state) return;
     state.muted = !state.muted;
-    localStream.getAudioTracks().forEach((t) => (t.enabled = !state.muted));
+    if (localStream) {
+      localStream.getAudioTracks().forEach((t) => (t.enabled = !state.muted));
+    }
     updateUI();
   }
 
@@ -920,7 +952,12 @@
           global.RetroTransport.sendRaw({ type: "call_busy", to: fromPin });
           return;
         }
-        const f = ctx.ensureFriendByPin(fromPin);
+        const f = ctx.ensureFriendByPin(fromPin, ev.callerProfile || null);
+        if (ev.callerProfile) {
+          if (ev.callerProfile.name) f.n = ev.callerProfile.name;
+          if (ev.callerProfile.photo) f.photo = ev.callerProfile.photo;
+          else if (ev.callerProfile.emo) f.e = ev.callerProfile.emo;
+        }
         const ty = ev.callType === "video" ? "video" : "voice";
         state = {
           pin: fromPin,
@@ -934,6 +971,7 @@
           muted: false,
           camOff: false,
           speaker: true,
+          ringSilenced: false,
           facing: "user",
           minimized: false,
         };
@@ -941,12 +979,19 @@
         // Önemli: call_offer'dan milisaniyeler önce gelmiş geçerli call_ice adaylarını SİLME!
         if (!Array.isArray(pendingIceByPin[fromPin])) pendingIceByPin[fromPin] = [];
 
+        if (autoRejectPin === fromPin && Date.now() < autoRejectUntil) {
+          autoRejectPin = null;
+          autoRejectUntil = 0;
+          reject();
+          break;
+        }
+
         const st = ctx.getState();
         if (st.set.sound) ctx.ringPlay(ty === "video" ? st.set.ringG : st.set.ringV, 16);
         if (global.RetroHaptics) global.RetroHaptics.nudge(st.set.vib);
         clearInterval(incVibTimer);
         incVibTimer = setInterval(() => {
-          if (!state || state.phase !== "ringing" || state.dir !== "in") {
+          if (!state || state.phase !== "ringing" || state.dir !== "in" || state.ringSilenced) {
             clearInterval(incVibTimer);
             incVibTimer = null;
             return;
@@ -1025,7 +1070,8 @@
 
       case "call_end": {
         if (state && state.pin === fromPin) {
-          cleanup(true, "Görüşme sonlandırıldı");
+          const msg = state.dir === "in" && state.phase === "ringing" ? "📵 Cevapsız arama" : "Görüşme sonlandırıldı";
+          cleanup(true, msg);
         }
         break;
       }
@@ -1065,6 +1111,7 @@
     ctx = options;
     $("cAcc").onclick = accept;
     $("cRej").onclick = reject;
+    if ($("cSil")) $("cSil").onclick = silenceRing;
     $("cEnd").onclick = hangup;
     $("cMute").onclick = toggleMute;
     $("cCam").onclick = toggleCam;
@@ -1072,6 +1119,19 @@
     $("cMin").onclick = minimize;
     if ($("cSpk")) $("cSpk").onclick = toggleSpeaker;
     if ($("cChat")) $("cChat").onclick = minimize;
+    // Fiziksel ses kısma/açma tuşuna basınca gelen arama zilini sessize al
+    global.addEventListener("keydown", (e) => {
+      if (!e || !state || state.dir !== "in" || state.phase !== "ringing") return;
+      if (
+        e.key === "AudioVolumeDown" ||
+        e.key === "AudioVolumeUp" ||
+        e.key === "VolumeDown" ||
+        e.key === "VolumeUp" ||
+        e.key === "Escape"
+      ) {
+        silenceRing();
+      }
+    });
     if ($("cUnlockAud")) {
       $("cUnlockAud").onclick = () => {
         primeAudioGesture();
@@ -1112,12 +1172,21 @@
     loadIceServers();
   }
 
-  function prepareIncoming(fromPin, autoAns) {
+  function prepareIncoming(fromPin, autoAns, autoRej) {
     if (!fromPin) return;
     const pin = String(fromPin).trim().toUpperCase();
     if (state && state.pin === pin && state.dir === "in" && state.phase === "ringing") {
+      if (autoRej) {
+        reject();
+        return;
+      }
       maximize();
       if (autoAns) accept();
+      return;
+    }
+    if (autoRej) {
+      autoRejectPin = pin;
+      autoRejectUntil = Date.now() + 15000;
       return;
     }
     if (autoAns) {
@@ -1132,7 +1201,18 @@
 
   function getCallInfo() {
     if (!state) return null;
-    return { pin: state.pin, type: state.type, active: state.phase === "active" };
+    return {
+      pin: state.pin,
+      type: state.type,
+      dir: state.dir,
+      phase: state.phase,
+      active: state.phase === "active",
+      muted: !!state.muted,
+      camOff: !!state.camOff,
+      speaker: state.speaker !== false,
+      ringSilenced: !!state.ringSilenced,
+      minimized: !!state.minimized,
+    };
   }
 
   global.RetroCalls = {
@@ -1141,6 +1221,7 @@
     accept,
     reject,
     hangup,
+    silenceRing,
     minimize,
     maximize,
     prepareIncoming,
