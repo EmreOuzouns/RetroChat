@@ -878,6 +878,12 @@
 
   function toggleSpeaker() {
     if (!state) return;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      playRemoteMedia();
+      ctx.toast("🔊 iPhone'da ses seviyesi yan ses tuşlarından ayarlanır");
+      return;
+    }
     state.speaker = state.speaker === false ? true : false;
     const ra = $("remAud");
     const vol = state.speaker ? 1.0 : 0.55;
