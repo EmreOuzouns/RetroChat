@@ -307,7 +307,7 @@ const RINGS={
  yumusak:{n:"Yumuşak",w:"triangle",p:1.8,s:[[392,0,.35],[523,.3,.35],[659,.6,.6]]},
  sessiz:{n:"Sessiz",w:"sine",p:1,s:[]}};
 let ringN=[];
-function ringStop(){ringN.forEach(o=>{try{o.stop()}catch(e){}});ringN=[]}
+function ringStop(suspendCtx){ringN.forEach(o=>{try{o.stop()}catch(e){}});ringN=[];if(suspendCtx&&ac&&ac.state=="running"){try{ac.suspend()}catch(e){}}}
 function ringPlay(k,loops){ringStop();const r=RINGS[k];if(!r||!r.s.length)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state=="suspended")ac.resume();const v=.25*(st.set.vol||60)/100,t0=ac.currentTime;for(let l=0;l<loops;l++)r.s.forEach(x=>{const o=ac.createOscillator(),g=ac.createGain(),a=t0+l*r.p+x[1];o.type=r.w;o.frequency.value=x[0];g.gain.setValueAtTime(.0001,a);g.gain.exponentialRampToValueAtTime(Math.max(v,.0002),a+.02);g.gain.exponentialRampToValueAtTime(.0001,a+x[2]);o.connect(g);g.connect(ac.destination);o.start(a);o.stop(a+x[2]+.02);ringN.push(o)})}catch(e){}}
 st.set.ringV=RINGS[st.set.ringV]?st.set.ringV:"klasik";st.set.ringG=RINGS[st.set.ringG]?st.set.ringG:"retro";
 function ringSync(){[["ringVoice","ringV"],["ringVideo","ringG"]].forEach(a=>document.querySelectorAll("#"+a[0]+" button").forEach(b=>b.classList.toggle("on",b.dataset.k==st.set[a[1]])))}

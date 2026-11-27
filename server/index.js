@@ -627,7 +627,9 @@ const server = http.createServer((req, res) => {
     const iceServers = [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" },
       { urls: "stun:stun.cloudflare.com:3478" },
+      { urls: "stun:stun.relay.metered.ca:80" },
     ];
     if (process.env.TURN_URL && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
       iceServers.push({

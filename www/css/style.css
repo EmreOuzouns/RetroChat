@@ -1281,3 +1281,6 @@ body.cfc.cfl #chat #chd #back svg path{stroke:#161a4a!important}
 @media(max-width:599px){
  body.lt:not(#zz):not(#zy) #set.sub #sFrMain{padding-top:calc(14px + env(safe-area-inset-top,0px))!important}
 }
+
+/* ===== v30: Arama Ses Kilidi Kurtarma Butonu ===== */
+#cUnlockAud{margin-top:14px;padding:10px 18px;border-radius:999px;border:1.5px solid rgba(0,229,255,.85);background:linear-gradient(135deg,#00c6ff,#8f6bff);color:#fff;font-size:14px;font-weight:800;align-items:center;justify-content:center;gap:6px;box-shadow:0 6px 24px rgba(0,198,255,.5);cursor:pointer;animation:cpulse 1.4s infinite}
