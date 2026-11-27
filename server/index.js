@@ -520,6 +520,8 @@ const ASSET_LABELS = {
   "/js/games.js": "Mini oyunlar",
   "/js/voice.js": "Sesli mesaj",
   "/js/qr.js": "QR kod modülü",
+  "/js/vendor/qrcode.min.js": "QR oluşturucu motoru",
+  "/js/vendor/jsQR.min.js": "QR tarayıcı motoru",
   "/js/haptics.js": "Titreşim motoru",
   "/manifest.json": "Uygulama ayarları",
 };

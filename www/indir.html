@@ -7,27 +7,30 @@
 <meta name="apple-mobile-web-app-title" content="RetroChat">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#060918">
-<title>RetroChat — Uygulamayı Kur</title>
+<title>RetroChat — Android & iOS İndir</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box}
-body{margin:0;min-height:100dvh;font-family:Inter,Segoe UI,sans-serif;color:#f1f2ff;background:radial-gradient(600px 420px at 15% 10%,rgba(0,229,255,.22),transparent),radial-gradient(600px 420px at 85% 90%,rgba(180,76,255,.26),transparent),#060918;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{width:100%;max-width:420px;background:rgba(16,20,56,.78);border:1.5px solid rgba(98,198,238,.55);border-radius:32px;padding:28px 22px;box-shadow:0 0 28px rgba(0,229,255,.18),0 24px 60px rgba(0,0,0,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);text-align:center}
-.ico{width:84px;height:84px;border-radius:22px;margin:0 auto 14px;display:block;box-shadow:0 8px 24px rgba(0,229,255,.3)}
+body{margin:0;min-height:100dvh;font-family:Inter,Segoe UI,sans-serif;color:#f1f2ff;background:radial-gradient(600px 420px at 15% 10%,rgba(0,229,255,.22),transparent),radial-gradient(600px 420px at 85% 90%,rgba(180,76,255,.26),transparent),#060918;display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px))}
+.card{width:100%;max-width:430px;background:rgba(16,20,56,.78);border:1.5px solid rgba(98,198,238,.55);border-radius:32px;padding:26px 20px;box-shadow:0 0 28px rgba(0,229,255,.18),0 24px 60px rgba(0,0,0,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);text-align:center}
+.ico{width:82px;height:82px;border-radius:22px;margin:0 auto 12px;display:block;box-shadow:0 8px 24px rgba(0,229,255,.3)}
 h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 6px;background:linear-gradient(90deg,#00e5ff,#c64cff);-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{font-size:13.5px;color:#b8bce6;line-height:1.5;margin:0 0 18px}
+.sub{font-size:13.5px;color:#b8bce6;line-height:1.5;margin:0 0 16px}
 .badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(0,229,255,.14);border:1px solid rgba(0,229,255,.4);color:#7fe6ff;margin-bottom:16px}
-.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:15px 18px;border-radius:18px;font-size:15px;font-weight:700;text-decoration:none;border:0;cursor:pointer;margin-bottom:10px;transition:transform .15s,box-shadow .15s}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;border-radius:18px;font-size:15px;font-weight:700;text-decoration:none;border:0;cursor:pointer;margin-bottom:10px;transition:transform .15s,box-shadow .15s}
 .btn:active{transform:scale(.98)}
 .btn.inst{background:linear-gradient(135deg,#00e5ff,#8f6bff);color:#fff;box-shadow:0 6px 24px rgba(0,200,255,.45)}
+.btn.ios{background:linear-gradient(135deg,#ffffff,#d6e4ff);color:#0e1538;box-shadow:0 6px 20px rgba(180,210,255,.35)}
 .btn.pri{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.22);color:#fff}
+.warn{display:none;text-align:left;background:rgba(255,159,10,.16);border:1.5px solid rgba(255,159,10,.6);color:#ffe4b5;border-radius:18px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.5}
+.warn b{color:#fff;display:block;margin-bottom:3px}
 .box{text-align:left;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:14px 16px;margin-top:12px;font-size:13px;line-height:1.55;color:#d6dcf8}
 .box b{color:#fff;display:block;margin-bottom:6px;font-size:14px}
 .box ol{margin:0;padding-left:18px}
-.box li{margin-bottom:4px}
+.box li{margin-bottom:5px}
 .msg{font-size:12.5px;color:#7fe6ff;min-height:18px;margin:4px 0 8px}
 .ft{margin-top:16px;font-size:11.5px;color:#8f93c9}
 </style>
@@ -39,7 +42,18 @@ h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 
   <p class="sub">Yalnızca 8 haneli PIN ile anlık mesajlaşma, gerçek telefon titreşimi, sesli/görüntülü arama ve canlı mini oyunlar.</p>
   <div id="devBadge" class="badge">Uygulama Kurulumu</div>
 
-  <button id="pwaBtn" class="btn inst" style="display:none">⚡ Tek Tıkla Uygulamayı Kur</button>
+  <div id="inAppWarn" class="warn">
+    <b>⚠️ Uygulama içi tarayıcıdasın!</b>
+    iPhone'da RetroChat'i ana ekrana kurabilmek ve bildirimleri açabilmek için sağ alttaki <b>🧭 Safari</b> simgesine basarak bu sayfayı <b>Safari</b>'de aç.
+  </div>
+
+  <!-- Android: Tek tıkla WebAPK kurulumu (Otomatik Engelleyici gerekmez) -->
+  <button id="pwaBtn" class="btn inst" style="display:none">⚡ Tek Tıkla Uygulamayı Kur (Android)</button>
+
+  <!-- iOS: Doğrudan iPhone Kurulum + IPA indirme -->
+  <button id="iosInstallBtn" class="btn inst" style="display:none">📲 iPhone'a Uygulama Olarak Kur (Önerilen)</button>
+  <a id="iosIpaBtn" href="https://github.com/EmreOuzouns/RetroChat/releases/latest/download/retrochat.ipa" class="btn ios" style="display:none">🍎 iOS Dosyasını İndir (.ipa)</a>
+
   <a href="/" class="btn pri" id="openBtn">🚀 Uygulamayı Aç</a>
   <div id="hint" class="msg"></div>
 
@@ -53,11 +67,13 @@ h1{font-family:Orbitron,sans-serif;font-size:24px;letter-spacing:2px;margin:0 0 
   </div>
 
   <div id="iosBox" class="box" style="display:none">
-    <b>🍎 iPhone (iOS) Kurulumu (10 sn)</b>
+    <b>🍎 iPhone / iPad (iOS) Kurulumu & Bildirimler (10 sn)</b>
     <ol>
-      <li>Bu sayfayı <b>Safari</b> ile açtığından emin ol ve <b>"Uygulamayı Aç"</b> butonuna bas.</li>
-      <li>Ekranın alt ortasındaki <b>Paylaş (⬆️)</b> simgesine dokun.</li>
-      <li><b>"Ana Ekrana Ekle"</b> → <b>"Ekle"</b> de. Ana ekranına RetroChat ikonuyla tam ekran uygulama olarak yerleşir.</li>
+      <li>Bu linki <b>Safari</b> ile açtığından emin ol ve <b>"Uygulamayı Aç"</b> butonuna bas.</li>
+      <li>Safari ekranının alt ortasındaki <b>Paylaş (⬆️)</b> simgesine dokun.</li>
+      <li><b>"Ana Ekrana Ekle"</b> → <b>"Ekle"</b> de.</li>
+      <li>Ana ekranındaki <b>RetroChat</b> ikonundan açıp <b>"🔔 Bildirimleri Aç"</b> butonuna bas — kapalıyken mesaj ve aramalar bildirim olarak düşer!</li>
+      <li><i>Alternatif (.ipa):</i> AltStore / Sideloadly / Xcode kullanıyorsan yukarıdaki <b>iOS Dosyasını İndir (.ipa)</b> butonunu kullanabilirsin.</li>
     </ol>
   </div>
 
@@ -71,34 +87,55 @@ if ("serviceWorker" in navigator) {
 const ua = navigator.userAgent || "";
 const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const isAnd = /Android/i.test(ua);
+const isInAppIOS = isIOS && /FBAN|FBAV|Instagram|Line|WhatsApp|Twitter|CriOS|FxiOS|EdgiOS/i.test(ua);
+
 const badge = document.getElementById("devBadge");
 const pwaBtn = document.getElementById("pwaBtn");
+const iosInstallBtn = document.getElementById("iosInstallBtn");
+const iosIpaBtn = document.getElementById("iosIpaBtn");
 const openBtn = document.getElementById("openBtn");
 const andBox = document.getElementById("andBox");
 const iosBox = document.getElementById("iosBox");
+const inAppWarn = document.getElementById("inAppWarn");
 const hint = document.getElementById("hint");
 
 if (isIOS) {
   badge.textContent = "🍎 iPhone / iPad algılandı";
+  iosInstallBtn.style.display = "flex";
+  iosIpaBtn.style.display = "flex";
   iosBox.style.display = "block";
-  openBtn.className = "btn inst";
-  openBtn.textContent = "🚀 RetroChat'i Aç (Safari)";
+  if (isInAppIOS) inAppWarn.style.display = "block";
 } else if (isAnd) {
   badge.textContent = "🤖 Android cihaz algılandı";
   pwaBtn.style.display = "flex";
   andBox.style.display = "block";
 } else {
-  badge.textContent = "💻 Masaüstü · Mobil Kurulum";
+  badge.textContent = "💻 Masaüstü · Android & iOS Kurulum";
   pwaBtn.style.display = "flex";
+  iosIpaBtn.style.display = "flex";
   andBox.style.display = "block";
   iosBox.style.display = "block";
 }
+
+iosInstallBtn.addEventListener("click", () => {
+  iosBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  iosBox.style.borderColor = "#00e5ff";
+  iosBox.style.boxShadow = "0 0 18px rgba(0,229,255,.4)";
+  hint.textContent = isInAppIOS
+    ? "Önce sağ alttan Safari'de aç, sonra Paylaş (⬆️) → Ana Ekrana Ekle'ye dokun!"
+    : "Safari'de alt ortadaki Paylaş (⬆️) simgesine dokun → 'Ana Ekrana Ekle' → 'Ekle' de!";
+  try {
+    if (navigator.share) {
+      navigator.share({ title: "RetroChat", url: location.origin + "/" }).catch(() => {});
+    }
+  } catch (e) {}
+});
 
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  pwaBtn.style.display = "flex";
+  if (!isIOS) pwaBtn.style.display = "flex";
 });
 
 pwaBtn.addEventListener("click", async () => {

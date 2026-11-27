@@ -1,4 +1,4 @@
-/* RetroChat İstemci Web Push & Uygulama İkonu Rozeti Modülü (Faz 6)
+/* RetroChat İstemci Web Push & Uygulama İkonu Rozeti Modülü (Faz 6 + v29 iOS Görünürlük Düzeltmesi)
  * Uygulama kapalıyken mesaj, titreşim (Nudge) ve sesli/görüntülü arama bildirimleri.
  */
 (function (global) {
@@ -17,6 +17,18 @@
     return true;
   }
 
+  function isIOSDevice() {
+    const ua = navigator.userAgent || "";
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  function isStandaloneMode() {
+    return (
+      (global.matchMedia && global.matchMedia("(display-mode: standalone)").matches) ||
+      navigator.standalone === true
+    );
+  }
+
   let ctx = null;
   let subscribed = false;
 
@@ -29,26 +41,63 @@
     );
   }
 
+  function openIOSGuide() {
+    const m = document.getElementById("iosPushMod");
+    if (m) {
+      m.style.display = "flex";
+    } else if (ctx) {
+      ctx.toast("iPhone'da Safari → Paylaş (⬆️) → Ana Ekrana Ekle ile kurup aç!");
+    }
+  }
+
+  function closeIOSGuide() {
+    const m = document.getElementById("iosPushMod");
+    if (m) m.style.display = "none";
+  }
+
   function updateUI() {
     const bar = document.getElementById("pushBar");
     const btn = document.getElementById("sPushBtn");
     const note = document.getElementById("sPushNote");
     const testRow = document.getElementById("sPushTestRow");
+    const ios = isIOSDevice();
+    const standalone = isStandaloneMode();
 
     if (!isSupported()) {
-      if (bar) bar.style.display = "none";
-      if (btn) btn.style.display = "none";
-      if (testRow) testRow.style.display = "none";
       const isCapNative = !!(global.Capacitor && global.Capacitor.isNativePlatform && global.Capacitor.isNativePlatform());
+      if (testRow) testRow.style.display = "none";
+      if (ios && !standalone && !isCapNative) {
+        // iOS normal Safari sekmesi: Bildirimler kısmını GİZLEME, iPhone kurulum rehberi olarak göster!
+        if (bar) {
+          bar.style.display = "flex";
+          bar.textContent = "🔔 iPhone Bildirimlerini Aç — Ana Ekrana Ekle (10 sn)";
+        }
+        if (btn) {
+          btn.style.display = "";
+          btn.textContent = "🔔 iPhone'da Nasıl Açılır?";
+        }
+        if (note) {
+          note.textContent = "iPhone (iOS 16.4+) bildirimleri için Safari → Paylaş (⬆️) → Ana Ekrana Ekle ile ekleyip ana ekrandaki RetroChat ikonundan açman gerekir.";
+        }
+        return;
+      }
+      if (bar) bar.style.display = "none";
+      if (btn) {
+        btn.style.display = isCapNative ? "" : "none";
+        if (isCapNative) btn.textContent = "🔔 Cihaz Bildirimleri";
+      }
       if (note) {
         note.textContent = isCapNative
-          ? "Yerel uygulama bildirimleri cihaz ayarları üzerinden yönetilir. (Kapalı ekran push için PWA kurulumu veya Firebase FCM gerekir.)"
-          : "iPhone'da arka plan bildirimleri için uygulamayı Safari → Paylaş → Ana Ekrana Ekle ile açman gerekir.";
+          ? "Yerel uygulama bildirimleri cihaz ayarları üzerinden yönetilir."
+          : "Bu tarayıcı arka plan bildirimlerini desteklemiyor. Chrome veya Safari (Ana Ekrana Ekle) ile açabilirsin.";
       }
       return;
     }
 
     const perm = Notification.permission;
+    if (bar) bar.textContent = "🔔 Bildirimleri Aç — kapalıyken mesaj, istek & arama gelsin";
+    if (btn) btn.style.display = "";
+
     if (perm === "granted" && subscribed) {
       if (bar) bar.style.display = "none";
       if (btn) btn.textContent = "🔔 Bildirimler Aktif";
@@ -58,7 +107,11 @@
       if (bar) bar.style.display = "none";
       if (btn) btn.textContent = "🔕 İzin Engellendi";
       if (testRow) testRow.style.display = "none";
-      if (note) note.textContent = "Tarayıcı/telefon ayarlarından RetroChat bildirim iznini açabilirsin.";
+      if (note) {
+        note.textContent = ios
+          ? "iPhone Ayarlar → Bildirimler → RetroChat bölümünden bildirimlere izin verebilirsin."
+          : "Tarayıcı/telefon ayarlarından RetroChat bildirim iznini açabilirsin.";
+      }
     } else {
       if (bar) bar.style.display = "flex";
       if (btn) btn.textContent = "🔔 Bildirimleri Aç";
@@ -69,7 +122,13 @@
 
   async function subscribe(askPermission) {
     if (!isSupported()) {
-      if (askPermission && ctx) ctx.toast("Bu tarayıcıda push bildirimi için Ana Ekrana Ekle gerekir");
+      if (askPermission) {
+        if (isIOSDevice() && !isStandaloneMode()) {
+          openIOSGuide();
+        } else if (ctx) {
+          ctx.toast("Bu tarayıcıda push bildirimi için Ana Ekrana Ekle gerekir");
+        }
+      }
       updateUI();
       return false;
     }
@@ -92,7 +151,6 @@
       const expectedKey = urlBase64ToUint8Array(publicKey);
 
       let sub = await reg.pushManager.getSubscription();
-      // VAPID anahtarı değiştiyse eski aboneliği temizleyip yenile
       if (sub && sub.options && sub.options.applicationServerKey) {
         const curKey = new Uint8Array(sub.options.applicationServerKey);
         if (!uint8Equal(curKey, expectedKey)) {
@@ -157,11 +215,14 @@
     const bar = document.getElementById("pushBar");
     const btn = document.getElementById("sPushBtn");
     const testBtn = document.getElementById("sPushTest");
+    const iosClose = document.getElementById("iosPushX");
+    const iosMod = document.getElementById("iosPushMod");
     if (bar) bar.onclick = () => subscribe(true);
     if (btn) btn.onclick = () => subscribe(true);
     if (testBtn) testBtn.onclick = () => sendTest();
+    if (iosClose) iosClose.onclick = closeIOSGuide;
+    if (iosMod) iosMod.onclick = (e) => { if (e.target.id === "iosPushMod") closeIOSGuide(); };
 
-    // Service Worker'dan gelen "open_chat" ve "open_call" mesajlarını yakala
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("message", (ev) => {
         if (!ev.data) return;
@@ -173,7 +234,6 @@
       });
     }
 
-    // URL'de ?call=PIN&auto=1 veya ?chat=PIN varsa doğrudan aç
     try {
       const sp = new URLSearchParams(location.search);
       const callPin = sp.get("call");
@@ -198,5 +258,7 @@
     sendTest,
     updateBadge,
     updateUI,
+    openIOSGuide,
+    closeIOSGuide,
   };
 })(window);

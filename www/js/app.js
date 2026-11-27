@@ -273,6 +273,7 @@ let liveT=null;const live=()=>{clearTimeout(liveT);liveT=setTimeout(()=>{readSet
 $("set").addEventListener("input",live);$("set").addEventListener("change",live);
 window.androidBack=function(){
  const sh=$("shs");if(sh){sh.remove();return true}
+ if($("iosPushMod")&&$("iosPushMod").style.display=="flex"){if(window.RetroPush)RetroPush.closeIOSGuide();return true}
  if($("permTip")&&$("permTip").style.display=="flex"){if(window.RetroRequests)RetroRequests.closePermTip();return true}
  if($("fwdMod")&&$("fwdMod").style.display=="flex"){if(window.RetroExtras)RetroExtras.closeForward();return true}
  if($("csearch")&&$("csearch").classList.contains("show")){if(window.RetroExtras)RetroExtras.closeSearch();return true}
@@ -289,8 +290,9 @@ window.androidBack=function(){
  if($("pf").style.display=="flex"){$("pf").style.display="none";return true}
  if($("qrm")&&$("qrm").style.display=="flex"){QR.closeQR();return true}
  if($("add").style.display=="flex"){QR.stopCam();$("add").style.display="none";return true}
- if($("set").classList.contains("show")){if($("sSubHd").style.display=="flex")$("sBack").click();else $("sClose").click();return true}
+ if($("set").classList.contains("show")){if($("set").classList.contains("sub")||$("sSubHd").style.display=="flex")$("sBack").click();else $("sClose").click();return true}
  if($("app").classList.contains("open")){$("back").click();return true}
+ if(typeof cview!="undefined"&&cview!="chat"){setView("chat");return true}
  return false};
 $("sStx").addEventListener("input",()=>{st.set.stx=$("sStx").value;save();drawNp();smSync()});
 const VIS_TXT={all:"Yazdıkların herkes tarafından görülebilir.",contacts:"Yazdıkların sadece kişilerin tarafından görülebilir.",none:"Yazdıklarını hiç kimse göremez."};
@@ -369,7 +371,7 @@ $("fcGrid").onclick=e=>{const t=e.target.closest(".fcs");if(!t||t.classList.cont
 $("fcGrid").addEventListener("input",e=>{if(e.target.id=="fcCus"){st.set.fc=e.target.value;applyFC();const cur=st.set.fc;const pv=$("fcPrev"),f=fcInfo(cur);pv.style.background="linear-gradient(135deg,"+f.c2+","+f.c1+" 62%,"+f.c3+")";pv.style.color=f.light?"#161a4a":"#fff";$("fcName").textContent="Özel"}});
 $("fcGrid").addEventListener("change",e=>{if(e.target.id=="fcCus"){setFC(e.target.value)}});
 const SG={prof:"Profil",look:"Görünüm",snd:"Bildirimler ve ses",chat:"Sohbetler"};
-function sPage(g){document.querySelectorAll("#sGen .spg").forEach(x=>x.style.display=x.id=="spg-"+g?"":"none");$("sMenu").style.display=g?"none":"";$("sSubHd").style.display=g?"flex":"none";$("sFrTop").style.display=g?"none":"";if(!g)smSync();if(g)$("sSubT").textContent=SG[g];if(g=="look")drawFC();$("sFrMain").scrollTop=0}
+function sPage(g){document.querySelectorAll("#sGen .spg").forEach(x=>x.style.display=x.id=="spg-"+g?"":"none");$("sMenu").style.display=g?"none":"";$("sSubHd").style.display=g?"flex":"none";$("sFrTop").style.display=g?"none":"";$("set").classList.toggle("sub",!!g);if(!g)smSync();if(g)$("sSubT").textContent=SG[g];if(g=="look")drawFC();$("sFrMain").scrollTop=0}
 $("set").addEventListener("click",e=>{if(e.target.closest("#sClose")){closeSet();return}if(e.target.closest("#sBack")){sPage(null);return}const r=e.target.closest(".sm");if(r&&r.dataset.g)sPage(r.dataset.g)});
 $("sBack").onclick=e=>{if(e)e.stopPropagation();sPage(null)};
 $("sSubHd").onclick=e=>{if(e.target.closest("#sBack")||e.target.id==="sSubT"){e.stopPropagation();sPage(null)}};
@@ -919,3 +921,32 @@ $("sNewPin").onclick=function(){
   setTimeout(()=>{if(this.dataset.ok){this.textContent="Yenile";delete this.dataset.ok}},4000);
  }
 };
+
+/* ===== iOS & Mobil Sol Kenardan Kaydırarak Geri Gitme (Swipe-Back) ===== */
+(function () {
+  let sx = -1, sy = 0, st0 = 0;
+  document.addEventListener("touchstart", (e) => {
+    if (!e.touches || e.touches.length !== 1) { sx = -1; return; }
+    const tag = e.target && e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "CANVAS") { sx = -1; return; }
+    const t0 = e.touches[0];
+    if (t0.clientX <= 36) {
+      sx = t0.clientX;
+      sy = t0.clientY;
+      st0 = Date.now();
+    } else {
+      sx = -1;
+    }
+  }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (sx < 0 || !e.changedTouches || !e.changedTouches.length) return;
+    const t1 = e.changedTouches[0];
+    const dx = t1.clientX - sx;
+    const dy = Math.abs(t1.clientY - sy);
+    const dt = Date.now() - st0;
+    sx = -1;
+    if (dx >= 65 && dy < 60 && dt < 650 && typeof window.androidBack === "function") {
+      window.androidBack();
+    }
+  }, { passive: true });
+})();

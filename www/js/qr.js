@@ -1,7 +1,7 @@
-/* RetroChat QR Kod Oluşturma & Tarama Modülü
- * Klasik sürümden yeni mobil tasarıma entegre edilmiştir.
- * - PIN / QR Tara (Kamera + Görselden oku) / QR'ım sekmeleri
- * - Arkadaş ve kendi profilin için QR modalı
+/* RetroChat QR Kod Oluşturma & Tarama Modülü (v29)
+ * - Yerel qrcode.min.js & jsQR.min.js (CDN 404/çevrimdışı sorunu sıfır)
+ * - Çift tarama motoru: Android Chrome yerleşik BarcodeDetector + 640px ölçekli jsQR (iOS & tüm tarayıcılar)
+ * - Esnek format: RC1|PIN|AD, ham 8 haneli PIN veya metin içi PIN
  */
 (function (global) {
   function initQR(ctx) {
@@ -13,7 +13,7 @@
 
     function qrHTML(pin, name) {
       if (typeof qrcode === "undefined") {
-        return '<div style="padding:16px;opacity:.7;font-size:13px">QR kütüphanesi çevrimdışı (internet bağlantısı gerekir)</div>';
+        return '<div style="padding:16px;opacity:.7;font-size:13px">QR kütüphanesi yüklenemedi</div>';
       }
       const q = qrcode(0, "M");
       q.addData("RC1|" + pin + "|" + (name || ""));
@@ -40,12 +40,31 @@
     }
 
     let stream = null;
-    let raf = 0;
+    let scanTimer = 0;
+    let scanning = false;
+    let detector = null;
+
+    if (typeof global.BarcodeDetector !== "undefined") {
+      try {
+        detector = new global.BarcodeDetector({ formats: ["qr_code"] });
+      } catch (e) {
+        detector = null;
+      }
+    }
 
     function stopCam() {
-      cancelAnimationFrame(raf);
+      scanning = false;
+      clearTimeout(scanTimer);
+      scanTimer = 0;
+      const v = $("vid");
+      if (v) {
+        try { v.pause(); } catch (e) {}
+        v.srcObject = null;
+      }
       if (stream) {
-        stream.getTracks().forEach((k) => k.stop());
+        stream.getTracks().forEach((k) => {
+          try { k.stop(); } catch (e) {}
+        });
         stream = null;
       }
     }
@@ -55,47 +74,126 @@
       $("aE").textContent = text;
     }
 
+    function parseQRText(txt) {
+      const s = String(txt || "").trim();
+      if (!s) return null;
+      const m1 = /^RC1\|([0-9A-Fa-f]{8})\|(.*)$/.exec(s);
+      if (m1) return { pin: m1[1].toUpperCase(), name: (m1[2] || "").trim() };
+      const m2 = /^([0-9A-Fa-f]{8})$/.exec(s);
+      if (m2) return { pin: m2[1].toUpperCase(), name: "" };
+      const m3 = /(?:pin[=:\s]+)([0-9A-Fa-f]{8})\b/i.exec(s);
+      if (m3) return { pin: m3[1].toUpperCase(), name: "" };
+      return null;
+    }
+
     function onQR(txt) {
-      const m = /^RC1\|([0-9A-Fa-f]{8})\|(.*)$/.exec((txt || "").trim());
-      if (!m) return false;
-      const nm = m[2] || "Yeni kişi";
-      const err = addFriend(nm, m[1]);
+      const parsed = parseQRText(txt);
+      if (!parsed) return false;
+      const nm = parsed.name || "Kişi " + parsed.pin.slice(-4);
+      if (global.RetroHaptics) global.RetroHaptics.tap(getState().set.vib);
+      stopCam();
       tab("P");
+      if ($("aP")) $("aP").value = parsed.pin;
+      const err = addFriend(nm, parsed.pin);
       if (err) {
         setMsg(err, false);
       } else {
-        setMsg("✓ Ekleniyor: " + nm + " (" + m[1].toUpperCase() + ")", true);
+        setMsg("✓ Ekleniyor: " + nm + " (" + parsed.pin + ")", true);
+        if (showToast) showToast("📷 QR okundu: " + parsed.pin);
       }
       return true;
     }
 
-    async function startCam() {
+    function decodeCanvasWithJsQR(canvas, ctx2d) {
+      if (typeof jsQR === "undefined") return null;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        });
+        const img = ctx2d.getImageData(0, 0, canvas.width, canvas.height);
+        const r = jsQR(img.data, canvas.width, canvas.height, { inversionAttempts: "attemptBoth" });
+        return r && r.data ? r.data : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function startCam() {
+      stopCam();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMsg("Bu tarayıcıda kamera desteklenmiyor. 'Görselden oku' seçeneğini kullan.", false);
+        return;
+      }
+      setMsg("Kamera açılıyor… QR kodu çerçeveye tut", true);
+
+      try {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+        } catch (firstErr) {
+          // Arka kamera constraint'i reddedilirse herhangi bir kamerayı aç
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+
+        // Sürekli otomatik odaklama (destekleyen Android cihazlarda okuma hızını ciddi artırır)
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+          if (caps && Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+            await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+          }
+        } catch (e) {}
+
         const v = $("vid");
+        v.setAttribute("playsinline", "");
+        v.setAttribute("autoplay", "");
+        v.muted = true;
         v.srcObject = stream;
         await v.play();
+
+        setMsg("QR kodu kameraya göster…", true);
+        scanning = true;
+
         const c = document.createElement("canvas");
         const x = c.getContext("2d", { willReadFrequently: true });
-        const loop = () => {
-          if (!stream) return;
-          if (v.videoWidth && typeof jsQR !== "undefined") {
-            c.width = v.videoWidth;
-            c.height = v.videoHeight;
-            x.drawImage(v, 0, 0);
-            const r = jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-            if (r && onQR(r.data)) {
-              stopCam();
-              return;
+
+        const tick = async () => {
+          if (!scanning || !stream) return;
+          if (v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0) {
+            // 1) Yerleşik donanım hızlandırmalı BarcodeDetector (Android Chrome)
+            if (detector) {
+              try {
+                const codes = await detector.detect(v);
+                if (codes && codes.length) {
+                  for (const item of codes) {
+                    if (item.rawValue && onQR(item.rawValue)) return;
+                  }
+                }
+              } catch (e) {}
+            }
+
+            // 2) jsQR yedek motoru (en fazla 640px genişliğe ölçekli — hızlı ve net)
+            if (typeof jsQR !== "undefined") {
+              const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
+              c.width = Math.max(1, Math.round(v.videoWidth * scale));
+              c.height = Math.max(1, Math.round(v.videoHeight * scale));
+              x.drawImage(v, 0, 0, c.width, c.height);
+              const val = decodeCanvasWithJsQR(c, x);
+              if (val && onQR(val)) return;
             }
           }
-          raf = requestAnimationFrame(loop);
+          if (scanning) {
+            scanTimer = setTimeout(tick, 140);
+          }
         };
-        loop();
+
+        tick();
       } catch (e) {
-        setMsg("Kamera açılamadı. 'Görselden oku' seçeneğini kullanabilirsin.", false);
+        stopCam();
+        setMsg("Kamera izni verilmedi veya açılamadı. 'Görselden oku' seçeneğini kullanabilirsin.", false);
       }
     }
 
@@ -139,19 +237,39 @@
     $("qf").onchange = (e) => {
       const fl = e.target.files[0];
       if (!fl) return;
+      const objUrl = URL.createObjectURL(fl);
       const im = new Image();
-      im.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = im.width;
-        c.height = im.height;
-        const x = c.getContext("2d");
-        x.drawImage(im, 0, 0);
-        const r =
-          typeof jsQR !== "undefined" &&
-          jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
-        if (!r || !onQR(r.data)) setMsg("QR kod okunamadı.", false);
+      im.onload = async () => {
+        try {
+          if (detector) {
+            try {
+              const codes = await detector.detect(im);
+              if (codes && codes.length) {
+                for (const item of codes) {
+                  if (item.rawValue && onQR(item.rawValue)) return;
+                }
+              }
+            } catch (err) {}
+          }
+          const scale = Math.min(1, 1000 / Math.max(im.width, im.height));
+          const c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(im.width * scale));
+          c.height = Math.max(1, Math.round(im.height * scale));
+          const x = c.getContext("2d", { willReadFrequently: true });
+          x.drawImage(im, 0, 0, c.width, c.height);
+          const val = decodeCanvasWithJsQR(c, x);
+          if (!val || !onQR(val)) {
+            setMsg("Görselde geçerli bir RetroChat QR kodu bulunamadı.", false);
+          }
+        } finally {
+          URL.revokeObjectURL(objUrl);
+        }
       };
-      im.src = URL.createObjectURL(fl);
+      im.onerror = () => {
+        URL.revokeObjectURL(objUrl);
+        setMsg("Görsel yüklenemedi.", false);
+      };
+      im.src = objUrl;
       e.target.value = "";
     };
 
